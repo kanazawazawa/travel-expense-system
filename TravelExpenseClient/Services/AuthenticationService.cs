@@ -10,10 +10,10 @@ public class AuthenticationService
     private readonly IPublicClientApplication _app;
     private readonly string[] _scopes;
 
-    // TODO: Azure ADアプリ登録後、以下の値を実際の値に置き換えてください
-    private const string ClientId = "YOUR_CLIENT_APP_ID";
-    private const string TenantId = "YOUR_TENANT_ID";
-    private const string ApiClientId = "YOUR_API_CLIENT_ID";
+    // Azure ADアプリ登録情報
+    private const string ClientId = "d613203e-6233-42a5-a02a-b02ee73b70f2";
+    private const string TenantId = "f5581409-bf53-4ac0-8cf8-2ba3fe7b5684";
+    private const string ApiClientId = "152a1a3e-27e0-4600-8b77-aa02c1e64b5a";
 
     public AuthenticationService()
     {

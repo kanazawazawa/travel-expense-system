@@ -8,6 +8,7 @@ namespace TravelExpenseApi.Controllers;
 /// <summary>
 /// 旅費申請API
 /// </summary>
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class TravelExpensesController : ControllerBase
