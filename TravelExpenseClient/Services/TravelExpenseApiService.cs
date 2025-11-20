@@ -11,7 +11,10 @@ public class TravelExpenseApiService
 {
     private readonly HttpClient _httpClient;
     private readonly AuthenticationService? _authService;
-    private const string BaseUrl = "https://app-20251120-api.azurewebsites.net/api/TravelExpenses";
+    // ローカルAPI（認証あり）
+    private const string BaseUrl = "https://localhost:7115/api/TravelExpenses";
+    // Azure API（認証なし）- 必要に応じて切り替え
+    // private const string BaseUrl = "https://app-20251120-api.azurewebsites.net/api/TravelExpenses";
 
     // 認証なしのコンストラクタ（後方互換性のため）
     public TravelExpenseApiService()

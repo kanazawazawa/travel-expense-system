@@ -6,15 +6,18 @@ namespace TravelExpenseClient
     public partial class Form1 : Form
     {
         private readonly TravelExpenseApiService _apiService;
+        private readonly AuthenticationService _authService;
         private List<TravelExpenseResponse> _expenses = new();
         private bool _isEditMode = false;
         private string? _editingPartitionKey;
         private string? _editingRowKey;
 
-        public Form1()
+        // èªè¨¼ã‚ã‚Šã®ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+        public Form1(AuthenticationService authService)
         {
             InitializeComponent();
-            _apiService = new TravelExpenseApiService();
+            _authService = authService;
+            _apiService = new TravelExpenseApiService(authService);
         }
 
         private async void Form1_Load(object sender, EventArgs e)
@@ -26,22 +29,22 @@ namespace TravelExpenseClient
         {
             try
             {
-                // ˆê——‚ğ“Ç‚İ‚İ
+                // ä¸€è¦§ã‚’èª­ã¿è¾¼ã¿
                 _expenses = await _apiService.GetAllExpensesAsync();
                 
-                // DataGridView‚ÉƒoƒCƒ“ƒh
+                // DataGridViewã«ãƒã‚¤ãƒ³ãƒ‰
                 dataGridViewExpenses.DataSource = null;
                 dataGridViewExpenses.DataSource = _expenses;
                 
-                // —ñ‚Ì•\¦İ’è
+                // åˆ—ã®è¡¨ç¤ºè¨­å®š
                 ConfigureDataGridView();
                 
-                // ƒTƒ}ƒŠ[‚ğXV
+                // ã‚µãƒãƒªãƒ¼ã‚’æ›´æ–°
                 await LoadSummaryAsync();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"ƒf[ƒ^‚Ì“Ç‚İ‚İ‚É¸”s‚µ‚Ü‚µ‚½: {ex.Message}", "ƒGƒ‰[", 
+                MessageBox.Show($"ãƒ‡ãƒ¼ã‚¿ã®èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ã¾ã—ãŸ: {ex.Message}", "ã‚¨ãƒ©ãƒ¼", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -51,25 +54,25 @@ namespace TravelExpenseClient
             if (dataGridViewExpenses.Columns.Count > 0)
             {
                 dataGridViewExpenses.Columns["Id"].HeaderText = "ID";
-                dataGridViewExpenses.Columns["ApplicationDate"].HeaderText = "\¿“ú";
-                dataGridViewExpenses.Columns["ApplicantName"].HeaderText = "\¿Ò";
-                dataGridViewExpenses.Columns["TravelDate"].HeaderText = "o’£“ú";
-                dataGridViewExpenses.Columns["Destination"].HeaderText = "o’£æ";
-                dataGridViewExpenses.Columns["Purpose"].HeaderText = "–Ú“I";
-                dataGridViewExpenses.Columns["Transportation"].HeaderText = "Œğ’Êè’i";
-                dataGridViewExpenses.Columns["TransportationCost"].HeaderText = "Œğ’Ê”ï";
-                dataGridViewExpenses.Columns["AccommodationCost"].HeaderText = "h”‘”ï";
-                dataGridViewExpenses.Columns["MealCost"].HeaderText = "H–‘ã";
-                dataGridViewExpenses.Columns["OtherCost"].HeaderText = "‚»‚Ì‘¼";
-                dataGridViewExpenses.Columns["TotalAmount"].HeaderText = "‡Œv";
-                dataGridViewExpenses.Columns["Status"].HeaderText = "ƒXƒe[ƒ^ƒX";
-                dataGridViewExpenses.Columns["Remarks"].HeaderText = "”õl";
+                dataGridViewExpenses.Columns["ApplicationDate"].HeaderText = "ç”³è«‹æ—¥";
+                dataGridViewExpenses.Columns["ApplicantName"].HeaderText = "ç”³è«‹è€…";
+                dataGridViewExpenses.Columns["TravelDate"].HeaderText = "å‡ºå¼µæ—¥";
+                dataGridViewExpenses.Columns["Destination"].HeaderText = "å‡ºå¼µå…ˆ";
+                dataGridViewExpenses.Columns["Purpose"].HeaderText = "ç›®çš„";
+                dataGridViewExpenses.Columns["Transportation"].HeaderText = "äº¤é€šæ‰‹æ®µ";
+                dataGridViewExpenses.Columns["TransportationCost"].HeaderText = "äº¤é€šè²»";
+                dataGridViewExpenses.Columns["AccommodationCost"].HeaderText = "å®¿æ³Šè²»";
+                dataGridViewExpenses.Columns["MealCost"].HeaderText = "é£Ÿäº‹ä»£";
+                dataGridViewExpenses.Columns["OtherCost"].HeaderText = "ãã®ä»–";
+                dataGridViewExpenses.Columns["TotalAmount"].HeaderText = "åˆè¨ˆ";
+                dataGridViewExpenses.Columns["Status"].HeaderText = "ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹";
+                dataGridViewExpenses.Columns["Remarks"].HeaderText = "å‚™è€ƒ";
 
-                // “ú•t‚ÌƒtƒH[ƒ}ƒbƒg
+                // æ—¥ä»˜ã®ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆ
                 dataGridViewExpenses.Columns["ApplicationDate"].DefaultCellStyle.Format = "yyyy/MM/dd";
                 dataGridViewExpenses.Columns["TravelDate"].DefaultCellStyle.Format = "yyyy/MM/dd";
                 
-                // ‹àŠz‚ÌƒtƒH[ƒ}ƒbƒg
+                // é‡‘é¡ã®ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆ
                 dataGridViewExpenses.Columns["TransportationCost"].DefaultCellStyle.Format = "N0";
                 dataGridViewExpenses.Columns["AccommodationCost"].DefaultCellStyle.Format = "N0";
                 dataGridViewExpenses.Columns["MealCost"].DefaultCellStyle.Format = "N0";
@@ -83,15 +86,15 @@ namespace TravelExpenseClient
             try
             {
                 var summary = await _apiService.GetSummaryAsync();
-                labelTotal.Text = $"‘\¿”: {summary.TotalCount} Œ";
-                labelPending.Text = $"³”F‘Ò‚¿: {summary.PendingCount} Œ";
-                labelApproved.Text = $"³”FÏ‚İ: {summary.ApprovedCount} Œ";
-                labelRejected.Text = $"‹p‰º: {summary.RejectedCount} Œ";
-                labelTotalAmount.Text = $"‘”ï—p: {summary.TotalAmount:N0} ‰~";
+                labelTotal.Text = $"ç·ç”³è«‹æ•°: {summary.TotalCount} ä»¶";
+                labelPending.Text = $"æ‰¿èªå¾…ã¡: {summary.PendingCount} ä»¶";
+                labelApproved.Text = $"æ‰¿èªæ¸ˆã¿: {summary.ApprovedCount} ä»¶";
+                labelRejected.Text = $"å´ä¸‹: {summary.RejectedCount} ä»¶";
+                labelTotalAmount.Text = $"ç·è²»ç”¨: {summary.TotalAmount:N0} å††";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"ƒTƒ}ƒŠ[‚Ì“Ç‚İ‚İ‚É¸”s‚µ‚Ü‚µ‚½: {ex.Message}", "ƒGƒ‰[",
+                MessageBox.Show($"ã‚µãƒãƒªãƒ¼ã®èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ã¾ã—ãŸ: {ex.Message}", "ã‚¨ãƒ©ãƒ¼",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -114,7 +117,7 @@ namespace TravelExpenseClient
         {
             if (dataGridViewExpenses.SelectedRows.Count == 0)
             {
-                MessageBox.Show("•ÒW‚·‚és‚ğ‘I‘ğ‚µ‚Ä‚­‚¾‚³‚¢B", "Šm”F",
+                MessageBox.Show("ç·¨é›†ã™ã‚‹è¡Œã‚’é¸æŠã—ã¦ãã ã•ã„ã€‚", "ç¢ºèª",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -132,7 +135,7 @@ namespace TravelExpenseClient
         {
             if (dataGridViewExpenses.SelectedRows.Count == 0)
             {
-                MessageBox.Show("íœ‚·‚és‚ğ‘I‘ğ‚µ‚Ä‚­‚¾‚³‚¢B", "Šm”F",
+                MessageBox.Show("å‰Šé™¤ã™ã‚‹è¡Œã‚’é¸æŠã—ã¦ãã ã•ã„ã€‚", "ç¢ºèª",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -140,8 +143,8 @@ namespace TravelExpenseClient
             var selectedExpense = (TravelExpenseResponse)dataGridViewExpenses.SelectedRows[0].DataBoundItem;
             
             var result = MessageBox.Show(
-                $"\¿Ò: {selectedExpense.ApplicantName}\no’£æ: {selectedExpense.Destination}\n\n‚±‚Ì\¿‚ğíœ‚µ‚Ü‚·‚©?",
-                "íœŠm”F", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                $"ç”³è«‹è€…: {selectedExpense.ApplicantName}\nå‡ºå¼µå…ˆ: {selectedExpense.Destination}\n\nã“ã®ç”³è«‹ã‚’å‰Šé™¤ã—ã¾ã™ã‹?",
+                "å‰Šé™¤ç¢ºèª", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (result == DialogResult.Yes)
             {
@@ -149,12 +152,12 @@ namespace TravelExpenseClient
                 {
                     var partitionKey = selectedExpense.ApplicationDate.ToString("yyyy-MM");
                     await _apiService.DeleteExpenseAsync(partitionKey, selectedExpense.Id);
-                    MessageBox.Show("íœ‚µ‚Ü‚µ‚½B", "¬Œ÷", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("å‰Šé™¤ã—ã¾ã—ãŸã€‚", "æˆåŠŸ", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     await LoadDataAsync();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"íœ‚É¸”s‚µ‚Ü‚µ‚½: {ex.Message}", "ƒGƒ‰[",
+                    MessageBox.Show($"å‰Šé™¤ã«å¤±æ•—ã—ã¾ã—ãŸ: {ex.Message}", "ã‚¨ãƒ©ãƒ¼",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -186,12 +189,12 @@ namespace TravelExpenseClient
                 if (_isEditMode && _editingPartitionKey != null && _editingRowKey != null)
                 {
                     await _apiService.UpdateExpenseAsync(_editingPartitionKey, _editingRowKey, request);
-                    MessageBox.Show("XV‚µ‚Ü‚µ‚½B", "¬Œ÷", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("æ›´æ–°ã—ã¾ã—ãŸã€‚", "æˆåŠŸ", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
                     await _apiService.CreateExpenseAsync(request);
-                    MessageBox.Show("“o˜^‚µ‚Ü‚µ‚½B", "¬Œ÷", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("ç™»éŒ²ã—ã¾ã—ãŸã€‚", "æˆåŠŸ", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
 
                 groupBoxDetails.Visible = false;
@@ -199,7 +202,7 @@ namespace TravelExpenseClient
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"•Û‘¶‚É¸”s‚µ‚Ü‚µ‚½: {ex.Message}", "ƒGƒ‰[",
+                MessageBox.Show($"ä¿å­˜ã«å¤±æ•—ã—ã¾ã—ãŸ: {ex.Message}", "ã‚¨ãƒ©ãƒ¼",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -213,7 +216,7 @@ namespace TravelExpenseClient
         {
             if (string.IsNullOrWhiteSpace(textBoxApplicant.Text))
             {
-                MessageBox.Show("\¿Ò–¼‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B", "“ü—ÍƒGƒ‰[",
+                MessageBox.Show("ç”³è«‹è€…åã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚", "å…¥åŠ›ã‚¨ãƒ©ãƒ¼",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 textBoxApplicant.Focus();
                 return false;
@@ -221,7 +224,7 @@ namespace TravelExpenseClient
 
             if (string.IsNullOrWhiteSpace(textBoxDestination.Text))
             {
-                MessageBox.Show("o’£æ‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B", "“ü—ÍƒGƒ‰[",
+                MessageBox.Show("å‡ºå¼µå…ˆã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚", "å…¥åŠ›ã‚¨ãƒ©ãƒ¼",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 textBoxDestination.Focus();
                 return false;
@@ -229,7 +232,7 @@ namespace TravelExpenseClient
 
             if (string.IsNullOrWhiteSpace(textBoxPurpose.Text))
             {
-                MessageBox.Show("–Ú“I‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B", "“ü—ÍƒGƒ‰[",
+                MessageBox.Show("ç›®çš„ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚", "å…¥åŠ›ã‚¨ãƒ©ãƒ¼",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 textBoxPurpose.Focus();
                 return false;
@@ -237,7 +240,7 @@ namespace TravelExpenseClient
 
             if (comboBoxTransportation.SelectedIndex == -1)
             {
-                MessageBox.Show("Œğ’Êè’i‚ğ‘I‘ğ‚µ‚Ä‚­‚¾‚³‚¢B", "“ü—ÍƒGƒ‰[",
+                MessageBox.Show("äº¤é€šæ‰‹æ®µã‚’é¸æŠã—ã¦ãã ã•ã„ã€‚", "å…¥åŠ›ã‚¨ãƒ©ãƒ¼",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 comboBoxTransportation.Focus();
                 return false;
@@ -287,7 +290,7 @@ namespace TravelExpenseClient
                              numericUpDownAccommodation.Value + 
                              numericUpDownMeal.Value + 
                              numericUpDownOther.Value);
-            labelTotalCost.Text = $"{total:N0} ‰~";
+            labelTotalCost.Text = $"{total:N0} å††";
         }
     }
 }
