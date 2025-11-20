@@ -1,36 +1,64 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using TravelExpenseClient.Models;
 
 namespace TravelExpenseClient.Services;
 
 /// <summary>
-/// —·”ï¸ZAPIƒT[ƒrƒX
+/// æ—…è²»ç²¾ç®—APIã‚µãƒ¼ãƒ“ã‚¹
 /// </summary>
 public class TravelExpenseApiService
 {
     private readonly HttpClient _httpClient;
+    private readonly AuthenticationService? _authService;
     private const string BaseUrl = "https://app-20251120-api.azurewebsites.net/api/TravelExpenses";
 
+    // èªè¨¼ãªã—ã®ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ï¼ˆå¾Œæ–¹äº’æ›æ€§ã®ãŸã‚ï¼‰
     public TravelExpenseApiService()
     {
         _httpClient = new HttpClient();
     }
 
+    // èªè¨¼ã‚ã‚Šã®ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ï¼ˆæ¨å¥¨ï¼‰
+    public TravelExpenseApiService(AuthenticationService authService)
+    {
+        _httpClient = new HttpClient();
+        _authService = authService;
+    }
+
     /// <summary>
-    /// ‚·‚×‚Ä‚Ì—·”ï¸Z‚ğæ“¾
+    /// èªè¨¼ãƒˆãƒ¼ã‚¯ãƒ³ã‚’HttpClientã«è¨­å®š
+    /// </summary>
+    private async Task SetAuthorizationHeaderAsync()
+    {
+        if (_authService != null)
+        {
+            var token = await _authService.GetAccessTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = 
+                    new AuthenticationHeaderValue("Bearer", token);
+            }
+        }
+    }
+
+    /// <summary>
+    /// ã™ã¹ã¦ã®æ—…è²»ç²¾ç®—ã‚’å–å¾—
     /// </summary>
     public async Task<List<TravelExpenseResponse>> GetAllExpensesAsync()
     {
+        await SetAuthorizationHeaderAsync();
         var response = await _httpClient.GetAsync(BaseUrl);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<List<TravelExpenseResponse>>() ?? new List<TravelExpenseResponse>();
     }
 
     /// <summary>
-    /// ID‚Å—·”ï¸Z‚ğæ“¾
+    /// IDã§æ—…è²»ç²¾ç®—ã‚’å–å¾—
     /// </summary>
     public async Task<TravelExpenseResponse?> GetExpenseByIdAsync(string partitionKey, string rowKey)
     {
+        await SetAuthorizationHeaderAsync();
         var response = await _httpClient.GetAsync($"{BaseUrl}/{partitionKey}/{rowKey}");
         
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -43,40 +71,44 @@ public class TravelExpenseApiService
     }
 
     /// <summary>
-    /// V‹K—·”ï¸Z‚ğì¬
+    /// æ–°è¦æ—…è²»ç²¾ç®—ã‚’ä½œæˆ
     /// </summary>
     public async Task<TravelExpenseResponse> CreateExpenseAsync(TravelExpenseRequest request)
     {
+        await SetAuthorizationHeaderAsync();
         var response = await _httpClient.PostAsJsonAsync(BaseUrl, request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseResponse>() ?? throw new Exception("Failed to create expense");
     }
 
     /// <summary>
-    /// —·”ï¸Z‚ğXV
+    /// æ—…è²»ç²¾ç®—ã‚’æ›´æ–°
     /// </summary>
     public async Task<TravelExpenseResponse> UpdateExpenseAsync(string partitionKey, string rowKey, TravelExpenseRequest request)
     {
+        await SetAuthorizationHeaderAsync();
         var response = await _httpClient.PutAsJsonAsync($"{BaseUrl}/{partitionKey}/{rowKey}", request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseResponse>() ?? throw new Exception("Failed to update expense");
     }
 
     /// <summary>
-    /// ƒXƒe[ƒ^ƒX‚ğXV
+    /// ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ã‚’æ›´æ–°
     /// </summary>
     public async Task<TravelExpenseResponse> UpdateStatusAsync(string partitionKey, string rowKey, string status)
     {
+        await SetAuthorizationHeaderAsync();
         var response = await _httpClient.PatchAsJsonAsync($"{BaseUrl}/{partitionKey}/{rowKey}/status", status);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseResponse>() ?? throw new Exception("Failed to update status");
     }
 
     /// <summary>
-    /// —·”ï¸Z‚ğíœ
+    /// æ—…è²»ç²¾ç®—ã‚’å‰Šé™¤
     /// </summary>
     public async Task<bool> DeleteExpenseAsync(string partitionKey, string rowKey)
     {
+        await SetAuthorizationHeaderAsync();
         var response = await _httpClient.DeleteAsync($"{BaseUrl}/{partitionKey}/{rowKey}");
         
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -89,10 +121,11 @@ public class TravelExpenseApiService
     }
 
     /// <summary>
-    /// ƒTƒ}ƒŠ[‚ğæ“¾
+    /// ã‚µãƒãƒªãƒ¼ã‚’å–å¾—
     /// </summary>
     public async Task<TravelExpenseSummary> GetSummaryAsync()
     {
+        await SetAuthorizationHeaderAsync();
         var response = await _httpClient.GetAsync($"{BaseUrl}/summary");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseSummary>() ?? new TravelExpenseSummary();
