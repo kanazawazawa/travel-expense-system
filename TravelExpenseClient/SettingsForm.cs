@@ -53,6 +53,7 @@ namespace TravelExpenseClient
                 var configuration = new ConfigurationBuilder()
                     .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .AddJsonFile("appsettings.Production.json", optional: true, reloadOnChange: true)
                     .Build();
 
                 return configuration["ApiSettings:BaseUrl"] ?? LocalUrl;
@@ -121,22 +122,21 @@ namespace TravelExpenseClient
 
         private void SaveSettings(string baseUrl)
         {
-            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            // ローカル環境の場合はappsettings.jsonに保存
+            // Azure環境の場合はappsettings.Production.jsonに保存
+            var isLocalUrl = baseUrl.Contains("localhost");
+            var settingsPath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, 
+                isLocalUrl ? "appsettings.json" : "appsettings.Production.json"
+            );
 
-            // 既存の設定を読み込む
-            var settings = new Dictionary<string, object>();
-            
-            if (File.Exists(settingsPath))
+            // 設定オブジェクトを作成
+            var settings = new Dictionary<string, object>
             {
-                var json = File.ReadAllText(settingsPath);
-                settings = JsonSerializer.Deserialize<Dictionary<string, object>>(json) 
-                    ?? new Dictionary<string, object>();
-            }
-
-            // ApiSettingsを更新
-            settings["ApiSettings"] = new Dictionary<string, string>
-            {
-                { "BaseUrl", baseUrl }
+                ["ApiSettings"] = new Dictionary<string, string>
+                {
+                    { "BaseUrl", baseUrl }
+                }
             };
 
             // ファイルに書き込み

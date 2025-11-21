@@ -75,10 +75,25 @@ dotnet run
 ```
 
 #### WinForm Client
+
+デスクトップクライアントは本番環境用の設定ファイルが必要です：
+
+**TravelExpenseClient/appsettings.Production.json**
+```json
+{
+  "ApiSettings": {
+    "BaseUrl": "https://YOUR_AZURE_API_URL/api/TravelExpenses"
+  }
+}
+```
+
+実行：
 ```bash
 cd TravelExpenseClient
 dotnet run
 ```
+
+**注意**: `appsettings.Production.json` は `.gitignore` で除外されており、各開発者が個別に作成する必要があります。
 
 ## Azure デプロイ設定
 

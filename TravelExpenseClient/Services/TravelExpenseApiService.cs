@@ -42,6 +42,7 @@ public class TravelExpenseApiService
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile("appsettings.Production.json", optional: true, reloadOnChange: true)
                 .Build();
 
             return configuration["ApiSettings:BaseUrl"] ?? DefaultBaseUrl;
