@@ -29,6 +29,7 @@ namespace TravelExpenseWebApp.Services
         public string? ApplicantName { get; set; }
         public DateTime? TravelDate { get; set; }
         public string? Destination { get; set; }
+        public string? Transportation { get; set; }
         public string? Purpose { get; set; }
         public decimal? TransportationCost { get; set; }
         public decimal? AccommodationCost { get; set; }

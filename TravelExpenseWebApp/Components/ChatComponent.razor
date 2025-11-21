@@ -993,6 +993,10 @@ private string? lastKnownAgentId = null;
                 .ToDictionary(p => p[0].Trim().ToLowerInvariant(), p => p[1].Trim());
             
             Console.WriteLine($"📋 Parsed {parameters.Count} parameters");
+            foreach (var kvp in parameters)
+            {
+                Console.WriteLine($"   - {kvp.Key} = {kvp.Value}");
+            }
             
             var instruction = new TravelExpenseUIUpdateInstruction();
             
@@ -1004,6 +1008,9 @@ private string? lastKnownAgentId = null;
                 
             if (parameters.TryGetValue("destination", out var destination))
                 instruction.Destination = destination;
+            
+            if (parameters.TryGetValue("transportation", out var transportation))
+                instruction.Transportation = transportation;
                 
             if (parameters.TryGetValue("purpose", out var purpose))
                 instruction.Purpose = purpose;

@@ -12,6 +12,11 @@
 
 - ✅ 旅費申請の作成・一覧表示・削除
 - ✅ サマリー表示（総件数・合計金額・ステータス別集計）
+- ✅ **AI Agent統合** - Azure AI Foundry Agent Serviceによる対話型フォーム入力
+  - Copilot風のチャットインターフェース
+  - 自然言語での旅費情報入力
+  - 画像アップロード・クリップボード画像ペースト対応
+  - フォーム自動入力とハイライト表示
 - ✅ Microsoft Entra ID による認証・認可
 - ✅ Azure Table Storage によるデータ永続化
 - ✅ マルチクライアント対応（Web/Desktop）
@@ -47,9 +52,15 @@
   },
   "ApiSettings": {
     "BaseUrl": "https://localhost:7115/api/TravelExpenses"
+  },
+  "AzureAIAgent": {
+    "ProjectEndpoint": "https://yourproject.services.ai.azure.com/api/projects/yourproject",
+    "AgentId": "asst_xxxxxxxxxxxxx"
   }
 }
 ```
+
+**AI Agent機能を使用する場合は、`AI_AGENT_SETUP.md` を参照して設定してください。**
 
 ### 2. Microsoft Entra ID アプリ登録
 

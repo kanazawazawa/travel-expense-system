@@ -54,7 +54,7 @@
         <div class="col-md-6">
             <div class="mb-3">
                 <label class="form-label">交通手段 *</label>
-                <InputSelect class="form-control" @bind-Value="request.Transportation">
+                <InputSelect class="@($"form-control {GetFieldClass("Transportation")}")" @bind-Value="request.Transportation">
                     <option value="">-- 選択してください --</option>
                     <option value="新幹線">新幹線</option>
                     <option value="飛行機">飛行機</option>
@@ -195,6 +195,12 @@ private void HandleTravelExpenseUIUpdate(TravelExpenseUIUpdateInstruction instru
     {
         request.Destination = instruction.Destination;
         highlightedFields.Add("Destination");
+    }
+
+    if (!string.IsNullOrEmpty(instruction.Transportation))
+    {
+        request.Transportation = instruction.Transportation;
+        highlightedFields.Add("Transportation");
     }
 
     if (!string.IsNullOrEmpty(instruction.Purpose))
