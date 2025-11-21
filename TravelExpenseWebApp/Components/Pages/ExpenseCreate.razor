@@ -162,9 +162,14 @@ private TravelExpenseRequest request { get; set; } = new()
                 OtherCost = 0
             };
             
-            // 3秒後に一覧ページに移動
+            // 1.5秒後に一覧ページに移動
             await Task.Delay(1500);
             Navigation.NavigateTo("/expenses", forceLoad: true);
+        }
+        catch (Microsoft.AspNetCore.Components.NavigationException)
+        {
+            // NavigationException は正常なナビゲーション処理なので無視
+            // エラーメッセージを表示しない
         }
         catch (Exception ex)
         {
