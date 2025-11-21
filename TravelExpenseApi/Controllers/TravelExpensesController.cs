@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TravelExpenseApi.Models;
 using TravelExpenseApi.Services;
@@ -5,8 +6,9 @@ using TravelExpenseApi.Services;
 namespace TravelExpenseApi.Controllers;
 
 /// <summary>
-/// —·”ï\¿API
+/// æ—…è²»ç”³è«‹API
 /// </summary>
+// [Authorize]  // ä¸€æ™‚çš„ã«ç„¡åŠ¹åŒ–ï¼ˆãƒ‡ãƒ¢ç”¨ï¼‰
 [ApiController]
 [Route("api/[controller]")]
 public class TravelExpensesController : ControllerBase
@@ -21,7 +23,7 @@ public class TravelExpensesController : ControllerBase
     }
 
     /// <summary>
-    /// ‚·‚×‚Ä‚Ì—·”ï\¿‚ğæ“¾
+    /// ã™ã¹ã¦ã®æ—…è²»ç”³è«‹ã‚’å–å¾—
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<List<TravelExpenseResponse>>> GetAllExpenses()
@@ -39,7 +41,7 @@ public class TravelExpensesController : ControllerBase
     }
 
     /// <summary>
-    /// ID‚Å—·”ï\¿‚ğæ“¾
+    /// IDã§æ—…è²»ç”³è«‹ã‚’å–å¾—
     /// </summary>
     [HttpGet("{partitionKey}/{rowKey}")]
     public async Task<ActionResult<TravelExpenseResponse>> GetExpenseById(string partitionKey, string rowKey)
@@ -63,7 +65,7 @@ public class TravelExpensesController : ControllerBase
     }
 
     /// <summary>
-    /// V‹K—·”ï\¿‚ğì¬
+    /// æ–°è¦æ—…è²»ç”³è«‹ã‚’ä½œæˆ
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<TravelExpenseResponse>> CreateExpense([FromBody] TravelExpenseRequest request)
@@ -90,7 +92,7 @@ public class TravelExpensesController : ControllerBase
     }
 
     /// <summary>
-    /// —·”ï\¿‚ğXV
+    /// æ—…è²»ç”³è«‹ã‚’æ›´æ–°
     /// </summary>
     [HttpPut("{partitionKey}/{rowKey}")]
     public async Task<ActionResult<TravelExpenseResponse>> UpdateExpense(
@@ -122,7 +124,7 @@ public class TravelExpensesController : ControllerBase
     }
 
     /// <summary>
-    /// —·”ï\¿‚ÌƒXƒe[ƒ^ƒX‚ğXV
+    /// æ—…è²»ç”³è«‹ã®ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ã‚’æ›´æ–°
     /// </summary>
     [HttpPatch("{partitionKey}/{rowKey}/status")]
     public async Task<ActionResult<TravelExpenseResponse>> UpdateStatus(
@@ -149,7 +151,7 @@ public class TravelExpensesController : ControllerBase
     }
 
     /// <summary>
-    /// —·”ï\¿‚ğíœ
+    /// æ—…è²»ç”³è«‹ã‚’å‰Šé™¤
     /// </summary>
     [HttpDelete("{partitionKey}/{rowKey}")]
     public async Task<IActionResult> DeleteExpense(string partitionKey, string rowKey)
@@ -173,7 +175,7 @@ public class TravelExpensesController : ControllerBase
     }
 
     /// <summary>
-    /// ƒTƒ}ƒŠ[î•ñ‚ğæ“¾
+    /// ã‚µãƒãƒªãƒ¼æƒ…å ±ã‚’å–å¾—
     /// </summary>
     [HttpGet("summary")]
     public async Task<ActionResult<TravelExpenseSummary>> GetSummary()

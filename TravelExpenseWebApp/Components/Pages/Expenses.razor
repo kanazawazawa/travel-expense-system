@@ -1,0 +1,183 @@
+@page "/expenses"
+@using Microsoft.JSInterop
+@using TravelExpenseWebApp.Models
+@using TravelExpenseWebApp.Services
+@inject TravelExpenseApiService ApiService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@* @attribute [Microsoft.AspNetCore.Authorization.Authorize] *@
+
+<PageTitle>旅費精算一覧</PageTitle>
+
+<h1>旅費精算一覧</h1>
+
+@if (isLoading)
+{
+    <p><em>読み込み中...</em></p>
+}
+else if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else
+{
+    <div class="mb-3">
+        <button class="btn btn-primary" @onclick="NavigateToCreate">
+            <i class="bi bi-plus-circle"></i> 新規登録
+        </button>
+        <button class="btn btn-secondary" @onclick="LoadData">
+            <i class="bi bi-arrow-clockwise"></i> 更新
+        </button>
+    </div>
+
+    @if (summary != null)
+    {
+        <div class="row mb-4">
+            <div class="col-md-2">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">総申請数</h5>
+                        <p class="card-text h3">@summary.TotalCount 件</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card text-center text-warning">
+                    <div class="card-body">
+                        <h5 class="card-title">承認待ち</h5>
+                        <p class="card-text h3">@summary.PendingCount 件</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card text-center text-success">
+                    <div class="card-body">
+                        <h5 class="card-title">承認済み</h5>
+                        <p class="card-text h3">@summary.ApprovedCount 件</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card text-center text-danger">
+                    <div class="card-body">
+                        <h5 class="card-title">却下</h5>
+                        <p class="card-text h3">@summary.RejectedCount 件</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center text-primary">
+                    <div class="card-body">
+                        <h5 class="card-title">総費用</h5>
+                        <p class="card-text h3">@summary.TotalAmount.ToString("N0") 円</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>申請日</th>
+                <th>申請者</th>
+                <th>出張日</th>
+                <th>出張先</th>
+                <th>目的</th>
+                <th>交通手段</th>
+                <th>合計金額</th>
+                <th>ステータス</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var expense in expenses)
+            {
+                <tr>
+                    <td>@expense.ApplicationDate.ToString("yyyy/MM/dd")</td>
+                    <td>@expense.ApplicantName</td>
+                    <td>@expense.TravelDate.ToString("yyyy/MM/dd")</td>
+                    <td>@expense.Destination</td>
+                    <td>@expense.Purpose</td>
+                    <td>@expense.Transportation</td>
+                    <td class="text-end">@expense.TotalAmount.ToString("N0") 円</td>
+                    <td>
+                        <span class="badge bg-@GetStatusBadgeClass(expense.Status)">
+                            @expense.Status
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteExpense(expense)">
+                            <i class="bi bi-trash"></i> 削除
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<TravelExpenseResponse> expenses = new();
+    private TravelExpenseSummary? summary;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            expenses = await ApiService.GetAllExpensesAsync();
+            summary = await ApiService.GetSummaryAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"データの読み込みに失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void NavigateToCreate()
+    {
+        Navigation.NavigateTo("/expenses/create");
+    }
+
+    private async Task DeleteExpense(TravelExpenseResponse expense)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", $"{expense.ApplicantName}さんの{expense.Destination}への出張申請を削除しますか？"))
+        {
+            try
+            {
+                var partitionKey = expense.ApplicationDate.ToString("yyyy-MM");
+                await ApiService.DeleteExpenseAsync(partitionKey, expense.Id);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"削除に失敗しました: {ex.Message}";
+            }
+        }
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "承認済み" => "success",
+            "却下" => "danger",
+            "申請中" => "warning",
+            _ => "secondary"
+        };
+    }
+
+}

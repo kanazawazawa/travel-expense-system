@@ -1,10 +1,18 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Identity.Web;
 using TravelExpenseApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-// CORSİ’è (ƒtƒƒ“ƒgƒGƒ“ƒh‚©‚ç‚ÌƒAƒNƒZƒX‚ğ‹–‰Â)
+// Azure ADèªè¨¼ã®è¨­å®š
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+
+builder.Services.AddAuthorization();
+
+// CORSè¨­å®š (ãƒ•ãƒ­ãƒ³ãƒˆã‚¨ãƒ³ãƒ‰ã‹ã‚‰ã®ã‚¢ã‚¯ã‚»ã‚¹ã‚’è¨±å¯)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -17,7 +25,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 
-// Travel Expense Service ‚ğ DI ƒRƒ“ƒeƒi‚É“o˜^
+// Travel Expense Service ã‚’ DI ã‚³ãƒ³ãƒ†ãƒŠã«ç™»éŒ²
 builder.Services.AddSingleton<TravelExpenseService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -27,15 +35,17 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-// –{”ÔŠÂ‹«‚Å‚àSwagger‚ğ—LŒø‰»iƒeƒXƒg/ŠJ”­–Ú“Ij
+// æœ¬ç•ªç’°å¢ƒã§ã‚‚Swaggerã‚’æœ‰åŠ¹åŒ–ï¼ˆãƒ†ã‚¹ãƒˆ/é–‹ç™ºç›®çš„ï¼‰
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
-// CORS ‚ğ—LŒø‰»
+// CORS ã‚’æœ‰åŠ¹åŒ–
 app.UseCors("AllowAll");
 
+// èªè¨¼ãƒ»èªå¯ãƒŸãƒ‰ãƒ«ã‚¦ã‚§ã‚¢
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
