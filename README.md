@@ -84,17 +84,19 @@ dotnet run
 
 本番環境（Azure App Service）では、以下の環境変数を設定してください：
 
+**注意**: Azure App Serviceの環境変数では、階層構造を表現するために `:` ではなく `__`（ダブルアンダースコア）を使用します。
+
 ### TravelExpenseApi
-- `AzureTableStorage:ConnectionString`
-- `AzureAd:TenantId`
-- `AzureAd:ClientId`
+- `AzureTableStorage__ConnectionString`
+- `AzureAd__TenantId`
+- `AzureAd__ClientId`
 
 ### TravelExpenseWebApp
-- `AzureAd:TenantId`
-- `AzureAd:ClientId`
-- `AzureAd:ClientSecret`
-- `AzureAd:ApiClientId`
-- `ApiSettings:BaseUrl`
+- `AzureAd__TenantId`
+- `AzureAd__ClientId`
+- `AzureAd__ClientSecret`
+- `AzureAd__ApiClientId`
+- `ApiSettings__BaseUrl`
 
 ## セキュリティ
 
