@@ -474,5 +474,6 @@ secrets.json
 
 # ClickOnce published files
 TravelExpenseWebApp/wwwroot/downloads/*.application
+TravelExpenseWebApp/wwwroot/downloads/*.html
 TravelExpenseWebApp/wwwroot/downloads/Application Files/
 TravelExpenseWebApp/wwwroot/downloads/setup.exe
