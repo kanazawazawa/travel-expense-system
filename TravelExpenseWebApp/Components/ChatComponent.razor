@@ -8,6 +8,7 @@
 @inject TravelExpenseWebApp.Services.AzureAIAgentService AzureAIAgentService
 @inject TravelExpenseWebApp.Services.AgentModeService AgentModeService
 @inject TravelExpenseWebApp.Services.TravelExpenseUIUpdateService TravelExpenseUIUpdateService
+@implements IDisposable
 @rendermode InteractiveServer
 
 <div class="chat-container">
@@ -141,8 +142,18 @@
         }
     </div>
 
+    @if (!isAgentReady)
+    {
+        <div class="agent-initializing">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span>AIエージェントを準備中... @(initializationCountdown)秒</span>
+        </div>
+    }
+    
     <div class="chat-input-container">
-        <button class="chat-attach-btn" @onclick="TriggerFileInput" title="ファイルを添付" disabled="@isLoading">
+        <button class="chat-attach-btn" @onclick="TriggerFileInput" title="ファイルを添付" disabled="@(!isAgentReady || isLoading)">
             <i class="bi bi-paperclip"></i>
         </button>
         <InputFile @ref="inputFile" 
@@ -152,11 +163,12 @@
         <input type="text" 
                id="chatInput"
                class="chat-input" 
-               placeholder="メッセージを入力してください..." 
+               placeholder="@(isAgentReady ? "メッセージを入力してください..." : "AIエージェント準備中...")" 
                @bind="chatMessage" 
                @bind:event="oninput" 
-               @onkeypress="HandleKeyPress" />
-        <button class="chat-send-btn" @onclick="SendChatMessage" disabled="@(isLoading || (string.IsNullOrWhiteSpace(chatMessage) && selectedFile == null && clipboardImageData == null))">
+               @onkeypress="HandleKeyPress" 
+               disabled="@(!isAgentReady)" />
+        <button class="chat-send-btn" @onclick="SendChatMessage" disabled="@(!isAgentReady || isLoading || (string.IsNullOrWhiteSpace(chatMessage) && selectedFile == null && clipboardImageData == null))">
             <i class="bi bi-send-fill"></i>
         </button>
     </div>
@@ -271,12 +283,29 @@
         font-size: 0.9rem;
     }
     
+    .agent-initializing {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 15px;
+        background-color: #fff3cd;
+        border-top: 1px solid #ffc107;
+        border-bottom: 1px solid #ffc107;
+        color: #856404;
+        font-size: 0.875rem;
+    }
+    
     .chat-input-container {
         display: flex;
         padding: 15px;
         background-color: white;
         border-top: 1px solid #dee2e6;
         gap: 10px;
+    }
+    
+    .chat-input:disabled {
+        background-color: #e9ecef;
+        cursor: not-allowed;
     }
     
     .chat-input {
@@ -441,6 +470,11 @@ private string? lastKnownAgentId = null;
     // Clipboard image data
     private byte[]? clipboardImageData;
     private string? clipboardImageFileName;
+    
+    // Agent readiness tracking
+    private bool isAgentReady = false;
+    private int initializationCountdown = 5; // seconds
+    private System.Threading.Timer? countdownTimer;
 
     protected override async Task OnInitializedAsync()
     {
@@ -451,9 +485,15 @@ private string? lastKnownAgentId = null;
         tempAgentId = AzureAIAgentService.GetCurrentAgentId() ?? string.Empty;
         lastKnownAgentId = tempAgentId;
         
+        // Subscribe to agent ready events
+        AgentModeService.OnAgentReadyChanged += HandleAgentReadyChanged;
+        
         // 🚀 バックグラウンドでスレッドを事前作成（初回メッセージの高速化）
         if (string.IsNullOrEmpty(currentThreadId))
         {
+            // Start countdown timer
+            StartCountdownTimer();
+            
             _ = Task.Run(async () =>
             {
                 try
@@ -461,13 +501,25 @@ private string? lastKnownAgentId = null;
                     var threadId = await AzureAIAgentService.CreateThreadAsync();
                     currentThreadId = threadId;
                     AgentModeService.CurrentThreadId = threadId;
+                    AgentModeService.IsAgentReady = true;
+                    isAgentReady = true;
+                    countdownTimer?.Dispose();
                     Console.WriteLine($"✅ Thread pre-created: {threadId}");
+                    await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"⚠️ Failed to pre-create thread: {ex.Message}");
+                    isAgentReady = true; // Allow user to try anyway
+                    countdownTimer?.Dispose();
+                    await InvokeAsync(StateHasChanged);
                 }
             });
+        }
+        else
+        {
+            isAgentReady = true;
+            AgentModeService.IsAgentReady = true;
         }
     }
 
@@ -533,6 +585,18 @@ private string? lastKnownAgentId = null;
         ProcessClipboardImage(base64Data, fileName, fileSize);
     }
 
+    private void StartCountdownTimer()
+    {
+        countdownTimer = new System.Threading.Timer(async _ =>
+        {
+            if (initializationCountdown > 0)
+            {
+                initializationCountdown--;
+                await InvokeAsync(StateHasChanged);
+            }
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+    
     private async Task LoadChatHistoryAsync()
     {
         if (string.IsNullOrEmpty(currentThreadId))
@@ -1111,6 +1175,17 @@ private string? lastKnownAgentId = null;
         return summary.ToString();
     }
     
+    public void Dispose()
+    {
+        countdownTimer?.Dispose();
+        AgentModeService.OnAgentReadyChanged -= HandleAgentReadyChanged;
+    }
+    
+    private void HandleAgentReadyChanged()
+    {
+        isAgentReady = AgentModeService.IsAgentReady;
+        InvokeAsync(StateHasChanged);
+    }
 }
 
 
