@@ -471,3 +471,8 @@ appsettings.Local.json
 ## User Secrets
 ##
 secrets.json
+
+# ClickOnce published files
+TravelExpenseWebApp/wwwroot/downloads/*.application
+TravelExpenseWebApp/wwwroot/downloads/Application Files/
+TravelExpenseWebApp/wwwroot/downloads/setup.exe

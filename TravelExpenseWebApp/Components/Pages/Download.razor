@@ -1,0 +1,107 @@
+@page "/download"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>デスクトップアプリのダウンロード</PageTitle>
+
+<div class="container mt-4">
+    <h1>🖥️ デスクトップアプリのダウンロード</h1>
+    
+    <div class="alert alert-info mt-4">
+        <h4>Windows デスクトップアプリケーション</h4>
+        <p>旅費精算システムのデスクトップクライアントをダウンロードできます。</p>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">システム要件</h5>
+        </div>
+        <div class="card-body">
+            <ul>
+                <li><strong>OS</strong>: Windows 10 / 11 (64-bit)</li>
+                <li><strong>必須</strong>: .NET 8.0 Desktop Runtime</li>
+                <li><strong>容量</strong>: 約 50MB</li>
+            </ul>
+            
+            <div class="alert alert-warning">
+                <strong>⚠️ 重要</strong><br/>
+                .NET 8.0 Desktop Runtime が必要です。インストールされていない場合は先にダウンロードしてください。
+            </div>
+            
+            <a href="https://dotnet.microsoft.com/download/dotnet/8.0/runtime" 
+               class="btn btn-outline-secondary" 
+               target="_blank">
+                📥 .NET 8.0 Runtime をダウンロード
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">ダウンロード</h5>
+        </div>
+        <div class="card-body">
+            <h6>最新バージョン: 1.0.0</h6>
+            <p class="text-muted">リリース日: 2025年11月21日</p>
+            
+            <div class="d-grid gap-2 mb-3">
+                <a href="/downloads/TravelExpenseClient.application" 
+                   class="btn btn-success btn-lg">
+                    <i class="bi bi-download"></i> 今すぐダウンロード (ClickOnce)
+                </a>
+            </div>
+            
+            <h6 class="mt-4">インストール手順</h6>
+            <ol>
+                <li>上のボタンからインストーラーをダウンロード</li>
+                <li>ダウンロードしたファイルを実行</li>
+                <li>セキュリティ警告が表示されたら「詳細情報」→「実行」をクリック</li>
+                <li>画面の指示に従ってインストール</li>
+                <li>インストール完了後、デスクトップまたはスタートメニューから起動</li>
+            </ol>
+            
+            <div class="alert alert-info mt-3">
+                <strong>💡 自動更新機能</strong><br/>
+                ClickOnce を使用しているため、新しいバージョンが公開されると自動的に更新されます。
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">機能</h5>
+        </div>
+        <div class="card-body">
+            <ul>
+                <li>✅ 旅費申請の作成・編集・削除</li>
+                <li>✅ 申請一覧の表示</li>
+                <li>✅ サマリー統計の表示</li>
+                <li>✅ Microsoft Entra ID 認証</li>
+                <li>✅ オフライン対応（準備中）</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">トラブルシューティング</h5>
+        </div>
+        <div class="card-body">
+            <h6>インストールできない</h6>
+            <ul>
+                <li>.NET 8.0 Desktop Runtime がインストールされているか確認してください</li>
+                <li>管理者権限で実行してみてください</li>
+                <li>Windows Defender SmartScreen が警告を表示した場合: 「詳細情報」→「実行」</li>
+            </ul>
+            
+            <h6 class="mt-3">起動できない</h6>
+            <ul>
+                <li>アプリをアンインストールして再インストールしてください</li>
+                <li>ファイアウォール設定を確認してください</li>
+                <li>イベントビューアーでエラーログを確認してください</li>
+            </ul>
+            
+            <h6 class="mt-3">サポート</h6>
+            <p>問題が解決しない場合は、IT部門にお問い合わせください。</p>
+        </div>
+    </div>
+</div>

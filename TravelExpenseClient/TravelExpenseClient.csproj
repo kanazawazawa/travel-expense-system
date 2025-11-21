@@ -6,6 +6,25 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    
+    <!-- アプリケーション情報 -->
+    <AssemblyName>TravelExpenseClient</AssemblyName>
+    <AssemblyTitle>Travel Expense Client</AssemblyTitle>
+    <Product>Travel Expense Management System</Product>
+    <Company>Your Company</Company>
+    <Description>旅費精算システム デスクトップクライアント</Description>
+    <Copyright>Copyright © 2025</Copyright>
+    <Version>1.0.0</Version>
+    
+    <!-- ClickOnce 発行設定 -->
+    <PublishUrl>..\TravelExpenseWebApp\wwwroot\downloads\</PublishUrl>
+    <InstallUrl>https://app-20251121-webui.azurewebsites.net/downloads/</InstallUrl>
+    <UpdateEnabled>true</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <PublisherName>Your Company</PublisherName>
+    <ProductName>Travel Expense Client</ProductName>
   </PropertyGroup>
 
   <ItemGroup>
