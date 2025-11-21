@@ -491,9 +491,19 @@ private string? lastKnownAgentId = null;
         // Subscribe to agent ready events
         AgentModeService.OnAgentReadyChanged += HandleAgentReadyChanged;
         
+        // Check if already ready (thread pre-created by MainLayout)
+        if (AgentModeService.IsAgentReady && !string.IsNullOrEmpty(currentThreadId))
+        {
+            Console.WriteLine($"✅ [ChatComponent] Thread already pre-created by MainLayout: {currentThreadId}");
+            isAgentReady = true;
+            return;
+        }
+        
         // 🚀 バックグラウンドでスレッドを事前作成（初回メッセージの高速化）
+        // MainLayoutで作成されていない場合のフォールバック
         if (string.IsNullOrEmpty(currentThreadId))
         {
+            Console.WriteLine("⚠️ [ChatComponent] Thread not pre-created, starting countdown...");
             // Start countdown timer
             StartCountdownTimer();
             
@@ -507,12 +517,12 @@ private string? lastKnownAgentId = null;
                     AgentModeService.IsAgentReady = true;
                     isAgentReady = true;
                     countdownTimer?.Dispose();
-                    Console.WriteLine($"✅ Thread pre-created: {threadId}");
+                    Console.WriteLine($"✅ [ChatComponent] Thread pre-created: {threadId}");
                     await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"⚠️ Failed to pre-create thread: {ex.Message}");
+                    Console.WriteLine($"❌ [ChatComponent] Failed to pre-create thread: {ex.Message}");
                     isAgentReady = true; // Allow user to try anyway
                     countdownTimer?.Dispose();
                     await InvokeAsync(StateHasChanged);
