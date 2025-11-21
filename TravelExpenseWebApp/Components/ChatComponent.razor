@@ -1,0 +1,1109 @@
+@using TravelExpenseWebApp.Models
+@using TravelExpenseWebApp.Services
+@using Microsoft.Extensions.Configuration
+@using System.Text.Json
+@inject IHttpClientFactory HttpClientFactory
+@inject IConfiguration configuration
+@inject IJSRuntime JSRuntime
+@inject TravelExpenseWebApp.Services.AzureAIAgentService AzureAIAgentService
+@inject TravelExpenseWebApp.Services.AgentModeService AgentModeService
+@inject TravelExpenseWebApp.Services.TravelExpenseUIUpdateService TravelExpenseUIUpdateService
+@rendermode InteractiveServer
+
+<div class="chat-container">
+    <div class="chat-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0">旅費申請アシスタント</h5>
+                @{
+                    var currentAgentId = AzureAIAgentService.GetCurrentAgentId();
+                    if (!string.IsNullOrEmpty(currentAgentId))
+                    {
+                        var shortId = currentAgentId.Length > 8 ? currentAgentId.Substring(0, 8) + "..." : currentAgentId;
+                        <small class="text-muted">Agent: @shortId</small>
+                    }
+                    else
+                    {
+                        <small class="text-warning">Agent: Not configured</small>
+                    }
+                }
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleAgentSettings" title="Agent Settings">
+                    <i class="bi bi-gear"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary" @onclick="StartNewConversation">
+                    <i class="bi bi-plus-circle"></i> New
+                </button>
+            </div>
+        </div>
+        
+        @if (showAgentSettings)
+        {
+            <div class="agent-settings mt-2 p-2 border rounded bg-light">
+                <div class="row align-items-center mb-2">
+                    <div class="col-auto">
+                        <small class="text-muted">Current Agent ID:</small>
+                    </div>
+                    <div class="col">
+                        <code class="small bg-white px-2 py-1 rounded border @(AzureAIAgentService.IsAgentIdModified() ? "border-warning" : "")">
+                            @(AzureAIAgentService.GetCurrentAgentId() ?? "Not set")
+                        </code>
+                        @if (AzureAIAgentService.IsAgentIdModified())
+                        {
+                            <small class="text-warning ms-2"><i class="bi bi-exclamation-triangle"></i> Modified</small>
+                        }
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(AzureAIAgentService.GetOriginalAgentId()))
+                {
+                    <div class="row align-items-center mb-2">
+                        <div class="col-auto">
+                            <small class="text-muted">Original (env):</small>
+                        </div>
+                        <div class="col">
+                            <code class="small bg-light px-2 py-1 rounded border text-muted">
+                                @AzureAIAgentService.GetOriginalAgentId()
+                            </code>
+                        </div>
+                    </div>
+                }
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <small class="text-muted">New Agent ID:</small>
+                    </div>
+                    <div class="col">
+                        <input type="text" class="form-control form-control-sm" @bind="tempAgentId" placeholder="Enter Agent ID" />
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-success" @onclick="UpdateAgentId" disabled="@string.IsNullOrWhiteSpace(tempAgentId)">
+                            <i class="bi bi-check"></i>
+                        </button>
+                        <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelAgentSettings">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(agentSettingsMessage))
+                {
+                    <div class="mt-1">
+                        <small class="@(agentSettingsSuccess ? "text-success" : "text-danger")">@agentSettingsMessage</small>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+    
+    <div class="chat-messages" id="chatMessages">
+        @if (chatHistory.Count == 0)
+        {
+            <div class="chat-message agent-message">
+                <div class="message-content">
+                    <p>こんにちは！旅費申請のアシスタントです。旅費申請フォームの入力をお手伝いします。例：「東京から大阪への出張、交通費15000円」</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            @foreach (var msg in chatHistory)
+            {
+                <div class="chat-message @(msg.IsUser ? "user-message" : "agent-message")">
+                    <div class="message-content">
+                        @if (msg.IsUser)
+                        {
+                            <p>@msg.Content</p>
+                        }
+                        else
+                        {
+                            @if (!string.IsNullOrEmpty(msg.FormattedContent))
+                            {
+                                @((MarkupString)msg.FormattedContent)
+                            }
+                            else
+                            {
+                                <p>@msg.Content</p>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        }
+
+        @if (isLoading)
+        {
+            <div class="chat-message agent-message">
+                <div class="message-content typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input-container">
+        <button class="chat-attach-btn" @onclick="TriggerFileInput" title="ファイルを添付" disabled="@isLoading">
+            <i class="bi bi-paperclip"></i>
+        </button>
+        <InputFile @ref="inputFile" 
+                   OnChange="HandleFileSelected" 
+                   accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp" 
+                   style="display: none;" />
+        <input type="text" 
+               id="chatInput"
+               class="chat-input" 
+               placeholder="メッセージを入力してください..." 
+               @bind="chatMessage" 
+               @bind:event="oninput" 
+               @onkeypress="HandleKeyPress" />
+        <button class="chat-send-btn" @onclick="SendChatMessage" disabled="@(isLoading || (string.IsNullOrWhiteSpace(chatMessage) && selectedFile == null && clipboardImageData == null))">
+            <i class="bi bi-send-fill"></i>
+        </button>
+    </div>
+    
+    @if (selectedFile != null || clipboardImageData != null)
+    {
+        <div class="file-preview">
+            <div class="file-info">
+                @if (selectedFile != null)
+                {
+                    <i class="bi @GetFileIcon(selectedFile.Name)"></i>
+                    <span class="file-name">@selectedFile.Name</span>
+                    <span class="file-size">(@FormatFileSize(selectedFile.Size))</span>
+                    <button class="btn-remove-file" @onclick="RemoveSelectedFile" title="削除">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                }
+                else if (clipboardImageData != null && clipboardImageFileName != null)
+                {
+                    <i class="bi bi-file-image-fill text-primary"></i>
+                    <span class="file-name">@clipboardImageFileName</span>
+                    <span class="file-size">(@FormatFileSize(clipboardImageData.Length))</span>
+                    <span class="badge bg-info ms-2">📋 ペースト</span>
+                    <button class="btn-remove-file" @onclick="RemoveClipboardImage" title="削除">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+        background-color: white;
+    }
+
+    .chat-header {
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .agent-settings {
+        background-color: #f8f9fa !important;
+        border: 1px solid #dee2e6 !important;
+        font-size: 0.875rem;
+    }
+    
+    .agent-settings .form-control-sm {
+        font-size: 0.8rem;
+        height: calc(1.5em + 0.25rem + 2px);
+    }
+    
+    .agent-settings .btn-sm {
+        padding: 0.1rem 0.3rem;
+        font-size: 0.8rem;
+    }
+    
+    .chat-messages {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background-color: #f8f9fa;
+        min-height: 0;
+    }
+    
+    .chat-message {
+        display: flex;
+        margin-bottom: 10px;
+    }
+    
+    .user-message {
+        justify-content: flex-end;
+    }
+    
+    .agent-message {
+        justify-content: flex-start;
+    }
+    
+    .message-content {
+        max-width: 85%;
+        padding: 10px 15px;
+        border-radius: 18px;
+        word-wrap: break-word;
+    }
+    
+    .user-message .message-content {
+        background-color: #0d6efd;
+        color: white;
+        border-bottom-right-radius: 5px;
+    }
+    
+    .agent-message .message-content {
+        background-color: #e9ecef;
+        color: #212529;
+        border-bottom-left-radius: 5px;
+    }
+    
+    .message-content p {
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    .chat-input-container {
+        display: flex;
+        padding: 15px;
+        background-color: white;
+        border-top: 1px solid #dee2e6;
+        gap: 10px;
+    }
+    
+    .chat-input {
+        flex-grow: 1;
+        padding: 10px 15px;
+        border: 1px solid #dee2e6;
+        border-radius: 20px;
+        outline: none;
+        font-size: 0.9rem;
+    }
+    
+    .chat-attach-btn {
+        width: 40px;
+        height: 40px;
+        border: none;
+        background-color: transparent;
+        color: #6c757d;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s;
+    }`n    .chat-attach-btn i { font-size: 1.2rem; }`n    .chat-send-btn i { font-size: 1.2rem; }
+    
+    .chat-attach-btn:hover {
+        background-color: #f8f9fa;
+        color: #0d6efd;
+    }
+    
+    .chat-attach-btn:disabled {
+        color: #dee2e6;
+        cursor: not-allowed;
+    }
+    
+    .chat-send-btn {
+        width: 40px;
+        height: 40px;
+        border: none;
+        background-color: #0d6efd;
+        color: white;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    
+    .chat-send-btn:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+    }
+    
+    .file-preview {
+        padding: 10px 15px;
+        background-color: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .file-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background-color: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        font-size: 0.875rem;
+    }
+    
+    .file-info i {
+        font-size: 1.2rem;
+        color: #0d6efd;
+    }
+    
+    .file-name {
+        flex-grow: 1;
+        font-weight: 500;
+        color: #212529;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .file-size {
+        color: #6c757d;
+        font-size: 0.8rem;
+    }
+    
+    .btn-remove-file {
+        background: none;
+        border: none;
+        color: #dc3545;
+        cursor: pointer;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .btn-remove-file:hover {
+        color: #bb2d3b;
+    }
+    
+    /* Typing indicator */
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+    
+    .typing-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #6c757d;
+        animation: typing 1.4s infinite ease-in-out;
+    }
+    
+    .typing-dot:nth-child(1) {
+        animation-delay: -0.32s;
+    }
+    
+    .typing-dot:nth-child(2) {
+        animation-delay: -0.16s;
+    }
+    
+    .typing-dot:nth-child(3) {
+        animation-delay: 0;
+    }
+    
+    @@keyframes typing {
+        0%, 80%, 100% {
+            transform: scale(0);
+        }
+        40% {
+            transform: scale(1);
+        }
+    }
+</style>
+
+@code {
+private List<ChatMessage> chatHistory = new List<ChatMessage>();
+private string chatMessage = string.Empty;
+private bool isLoading = false;
+private string? currentThreadId;
+    
+// Agent settings variables
+private bool showAgentSettings = false;
+private string tempAgentId = string.Empty;
+private string agentSettingsMessage = string.Empty;
+private bool agentSettingsSuccess = false;
+private string? lastKnownAgentId = null;
+    
+    // File upload variables
+    private InputFile? inputFile;
+    private IBrowserFile? selectedFile;
+    private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
+    
+    // Clipboard image data
+    private byte[]? clipboardImageData;
+    private string? clipboardImageFileName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize with the current thread ID if available
+        currentThreadId = AgentModeService.CurrentThreadId;
+        
+        // Initialize temp agent ID with current value
+        tempAgentId = AzureAIAgentService.GetCurrentAgentId() ?? string.Empty;
+        lastKnownAgentId = tempAgentId;
+        
+        // 🚀 バックグラウンドでスレッドを事前作成（初回メッセージの高速化）
+        if (string.IsNullOrEmpty(currentThreadId))
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var threadId = await AzureAIAgentService.CreateThreadAsync();
+                    currentThreadId = threadId;
+                    AgentModeService.CurrentThreadId = threadId;
+                    Console.WriteLine($"✅ Thread pre-created: {threadId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ Failed to pre-create thread: {ex.Message}");
+                }
+            });
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Check if Agent ID has changed (e.g., after reconnection)
+        var currentAgentId = AzureAIAgentService.GetCurrentAgentId();
+        if (currentAgentId != lastKnownAgentId)
+        {
+            lastKnownAgentId = currentAgentId;
+            tempAgentId = currentAgentId ?? string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Register JS function for scrolling
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                window.scrollToBottom = function(elementId) {
+                    var element = document.getElementById(elementId);
+                    if (element) {
+                        element.scrollTop = element.scrollHeight;
+                    }
+                }
+            ");
+            
+            // Load chat history asynchronously after the first render for better performance
+            await LoadChatHistoryAsync();
+        }
+        
+        // クリップボードからの画像ペーストを有効化（毎回実行して再接続後も確実に動作させる）
+        try
+        {
+            await EnableClipboardPaste();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ Failed to enable clipboard paste: {ex.Message}");
+        }
+        
+        // Scroll to bottom whenever component rerenders
+        await ScrollToBottom();
+    }
+    
+    /// <summary>
+    /// クリップボードからの画像ペーストを有効化
+    /// </summary>
+    private async Task EnableClipboardPaste()
+    {
+        var dotnetRef = DotNetObjectReference.Create(this);
+        await JSRuntime.InvokeVoidAsync("setupClipboardPaste", dotnetRef);
+    }
+    
+    /// <summary>
+    /// クリップボードから貼り付けた画像を受け取る
+    /// </summary>
+    [JSInvokable]
+    public void OnImagePasted(string base64Data, string fileName, long fileSize)
+    {
+        ProcessClipboardImage(base64Data, fileName, fileSize);
+    }
+
+    private async Task LoadChatHistoryAsync()
+    {
+        if (string.IsNullOrEmpty(currentThreadId))
+        {
+            return;
+        }
+
+        // For now, we'll skip loading chat history from the service
+        // as the method doesn't exist in the current implementation
+        await Task.CompletedTask;
+    }
+
+    private void StartNewConversation()
+    {
+        // Clear the current thread ID
+        currentThreadId = null;
+        AgentModeService.CurrentThreadId = null;
+        
+        // Reset the chat history
+        chatHistory.Clear();
+        
+        // Add a welcome message
+        chatHistory.Add(new ChatMessage
+        {
+            Content = "こんにちは！旅費申請のアシスタントです。旅費申請フォームの入力をお手伝いします。例：「東京から大阪への出張、交通費15000円」",
+            IsUser = false,
+            Timestamp = DateTime.Now
+        });
+        
+        // Update the UI
+        StateHasChanged();
+    }
+
+    private async Task SendChatMessage()
+    {
+        if (string.IsNullOrWhiteSpace(chatMessage) && selectedFile == null && clipboardImageData == null)
+            return;
+            
+        // メッセージ内容の準備
+        string displayMessage = chatMessage;
+        if (selectedFile != null)
+        {
+            displayMessage += $"\n📎 {selectedFile.Name} ({FormatFileSize(selectedFile.Size)})";
+        }
+        else if (clipboardImageData != null && clipboardImageFileName != null)
+        {
+            displayMessage += $"\n📋 {clipboardImageFileName} ({FormatFileSize(clipboardImageData.Length)})";
+        }
+            
+        // Add user message to chat history
+        chatHistory.Add(new ChatMessage { 
+            Content = displayMessage, 
+            IsUser = true,
+            Timestamp = DateTime.Now 
+        });
+        
+        string userMessage = chatMessage;
+        byte[]? fileBytes = null;
+        string? fileName = null;
+        string? contentType = null;
+        
+        // ファイルまたはクリップボード画像がある場合はバイト配列に変換
+        if (selectedFile != null)
+        {
+            try
+            {
+                // Blazor ServerではOpenReadStream()は同期読み込みをサポートしないため、
+                // 非同期でバイト配列に読み込む
+                using var stream = selectedFile.OpenReadStream(MaxFileSize);
+                using var memoryStream = new MemoryStream();
+                await stream.CopyToAsync(memoryStream);
+                fileBytes = memoryStream.ToArray();
+                fileName = selectedFile.Name;
+                contentType = selectedFile.ContentType;
+            }
+            catch (Exception ex)
+            {
+                chatHistory.Add(new ChatMessage
+                {
+                    Content = $"ファイルの読み込みに失敗しました: {ex.Message}",
+                    IsUser = false,
+                    Timestamp = DateTime.Now
+                });
+                StateHasChanged();
+                return;
+            }
+        }
+        else if (clipboardImageData != null && clipboardImageFileName != null)
+        {
+            // クリップボード画像を使用
+            fileBytes = clipboardImageData;
+            fileName = clipboardImageFileName;
+            contentType = "image/png";
+        }
+        
+        chatMessage = string.Empty; // Clear input field
+        var fileToSend = selectedFile;
+        selectedFile = null; // Clear selected file
+        clipboardImageData = null; // Clear clipboard image
+        clipboardImageFileName = null;
+        isLoading = true;
+        StateHasChanged(); // Update UI to show user message
+        
+        try
+        {
+            // Create a thread if this is the first message (should be rare due to pre-creation)
+            if (string.IsNullOrEmpty(currentThreadId))
+            {
+                Console.WriteLine("⚠️ Thread not pre-created, creating now...");
+                currentThreadId = await AzureAIAgentService.CreateThreadAsync();
+                AgentModeService.CurrentThreadId = currentThreadId;
+            }
+            else
+            {
+                Console.WriteLine($"✅ Using pre-created thread: {currentThreadId}");
+            }
+              
+            // Send message to Azure AI Agent and get response
+            string aiResponse;
+            
+            if (fileBytes != null && fileName != null)
+            {
+                // 画像ファイルの場合は、画像付きでメッセージを送信
+                if (IsImageFile(fileName))
+                {
+                    // バイト配列からストリームを作成
+                    using var imageStream = new MemoryStream(fileBytes);
+                    
+                    // 画像分析用のプロンプト
+                    string imagePrompt = string.IsNullOrWhiteSpace(userMessage) 
+                        ? "この画像から旅費申請に関連する情報（日付、出張先、金額、目的など）を抽出してください。画像内の文字や表をすべて読み取り、適切にフォーマットしてください。" 
+                        : $"{userMessage}\n\n添付した画像から旅費申請に関連する情報を抽出してください。";
+                    
+                    Console.WriteLine($"🖼️ Sending image message: {fileName}");
+                    aiResponse = await AzureAIAgentService.SendMessageWithImageAsync(currentThreadId, imagePrompt, imageStream, fileName);
+                }
+                else if (fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    // PDFは現時点ではテキストメッセージとして送信
+                    userMessage += $"\n\n[PDFファイル「{fileName}」を添付しました。このPDFの内容を分析して、出張情報（日付、場所、金額など）を抽出してください。]";
+                    aiResponse = await AzureAIAgentService.SendMessageAsync(currentThreadId, userMessage);
+                }
+                else
+                {
+                    aiResponse = await AzureAIAgentService.SendMessageAsync(currentThreadId, userMessage);
+                }
+            }
+            else
+            {
+                aiResponse = await AzureAIAgentService.SendMessageAsync(currentThreadId, userMessage);
+            }
+            
+            // Format the response for better HTML display
+            string formattedResponse = FormatAgentResponse(aiResponse);
+            
+            // Add AI response to chat history BEFORE parsing UI instructions
+            chatHistory.Add(new ChatMessage { 
+                Content = aiResponse,
+                FormattedContent = formattedResponse,
+                IsUser = false,
+                Timestamp = DateTime.Now 
+            });
+            
+            // Parse AI response for UI update instructions
+            // (chatHistoryに追加された後なので、GenerateChatSummary()が正しく動作する)
+            ParseAndExecuteUIInstructions(aiResponse);
+        }
+        catch (Exception ex)
+        {
+            // Handle any errors during AI communication
+            chatHistory.Add(new ChatMessage { 
+                Content = $"Sorry, I encountered an error: {ex.Message}. Please try again later.", 
+                IsUser = false,
+                Timestamp = DateTime.Now 
+            });
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged(); // Update UI with AI response
+            
+            // Scroll to bottom of chat
+            await ScrollToBottom();
+        }
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(chatMessage) && !isLoading)
+        {
+            await SendChatMessage();
+        }
+    }
+
+    private string FormatAgentResponse(string response)
+    {
+        // Format the response for better HTML display
+        
+        // Handle markdown-style bold text (convert **text** to <strong>text</strong>)
+        response = System.Text.RegularExpressions.Regex.Replace(
+            response, 
+            @"\*\*([^*]+)\*\*", 
+            "<strong>$1</strong>");
+            
+        // Handle line breaks and bullet points
+        return response
+            .Replace("\n\n", "<br><br>")
+            .Replace("\n", "<br>")
+            .Replace("•", "<br>•");
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            // Use JSRuntime to scroll to the bottom of the chat
+            await JSRuntime.InvokeVoidAsync("scrollToBottom", "chatMessages");
+        }
+        catch
+        {
+            // Silently fail if JS interop fails
+        }
+    }
+
+    private void ToggleAgentSettings()
+    {
+        showAgentSettings = !showAgentSettings;
+        if (showAgentSettings)
+        {
+            // Reset message and update temp ID with current value
+            agentSettingsMessage = string.Empty;
+            tempAgentId = AzureAIAgentService.GetCurrentAgentId() ?? string.Empty;
+        }
+    }
+
+    private async Task UpdateAgentId()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(tempAgentId))
+            {
+                agentSettingsMessage = "Agent ID cannot be empty";
+                agentSettingsSuccess = false;
+                return;
+            }
+
+            // Update the agent ID
+            AzureAIAgentService.SetAgentId(tempAgentId.Trim());
+            
+            // Clear current thread to start fresh with new agent
+            currentThreadId = null;
+            AgentModeService.CurrentThreadId = null;
+            chatHistory.Clear();
+            
+            agentSettingsMessage = "Agent ID updated successfully";
+            agentSettingsSuccess = true;
+            
+            // Hide settings after successful update
+            await Task.Delay(1500); // Show success message for 1.5 seconds
+            showAgentSettings = false;
+            agentSettingsMessage = string.Empty;
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            agentSettingsMessage = $"Error updating Agent ID: {ex.Message}";
+            agentSettingsSuccess = false;
+        }
+    }
+
+    private void CancelAgentSettings()
+    {
+        showAgentSettings = false;
+        agentSettingsMessage = string.Empty;
+        tempAgentId = AzureAIAgentService.GetCurrentAgentId() ?? string.Empty;
+    }
+    
+    /// <summary>
+    /// ファイル選択ダイアログを開く
+    /// </summary>
+    private async Task TriggerFileInput()
+    {
+        if (inputFile?.Element != null)
+        {
+            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('input[type=file]').click()");
+        }
+    }
+    
+    /// <summary>
+    /// ファイルが選択された時の処理
+    /// </summary>
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        
+        // ファイルサイズチェック
+        if (selectedFile.Size > MaxFileSize)
+        {
+            chatHistory.Add(new ChatMessage
+            {
+                Content = $"ファイルサイズが大きすぎます。10MB以下のファイルを選択してください。（選択されたファイル: {FormatFileSize(selectedFile.Size)}）",
+                IsUser = false,
+                Timestamp = DateTime.Now
+            });
+            selectedFile = null;
+            StateHasChanged();
+            return;
+        }
+        
+        StateHasChanged();
+    }
+    
+    /// <summary>
+    /// 選択されたファイルを削除
+    /// </summary>
+    private void RemoveSelectedFile()
+    {
+        selectedFile = null;
+        StateHasChanged();
+    }
+    
+    /// <summary>
+    /// クリップボード画像を削除
+    /// </summary>
+    private void RemoveClipboardImage()
+    {
+        clipboardImageData = null;
+        clipboardImageFileName = null;
+        StateHasChanged();
+    }
+    
+    /// <summary>
+    /// ファイルアイコンを取得
+    /// </summary>
+    private string GetFileIcon(string fileName)
+    {
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        return extension switch
+        {
+            ".pdf" => "bi-file-pdf-fill text-danger",
+            ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp" => "bi-file-image-fill text-primary",
+            _ => "bi-file-earmark-fill text-secondary"
+        };
+    }
+    
+    /// <summary>
+    /// ファイルサイズをフォーマット
+    /// </summary>
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+    
+    /// <summary>
+    /// 画像ファイルかどうかを判定
+    /// </summary>
+    private bool IsImageFile(string fileName)
+    {
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        return extension is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp";
+    }
+    
+    /// <summary>
+    /// クリップボード画像の処理
+    /// </summary>
+    private void ProcessClipboardImage(string base64Data, string fileName, long fileSize)
+    {
+        try
+        {
+            // Base64データからバイト配列に変換
+            var base64Parts = base64Data.Split(',');
+            var imageData = base64Parts.Length > 1 ? base64Parts[1] : base64Parts[0];
+            var bytes = Convert.FromBase64String(imageData);
+            
+            // ファイルサイズチェック
+            if (bytes.Length > MaxFileSize)
+            {
+                chatHistory.Add(new ChatMessage
+                {
+                    Content = $"画像サイズが大きすぎます。10MB以下の画像を使用してください。（貼り付けた画像: {FormatFileSize(bytes.Length)}）",
+                    IsUser = false,
+                    Timestamp = DateTime.Now
+                });
+                StateHasChanged();
+                return;
+            }
+            
+            // 既存のファイル選択をクリア
+            selectedFile = null;
+            
+            // クリップボード画像データを保存
+            clipboardImageData = bytes;
+            clipboardImageFileName = fileName;
+            
+            Console.WriteLine($"✅ Clipboard image ready: {fileName} ({FormatFileSize(bytes.Length)})");
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            chatHistory.Add(new ChatMessage
+            {
+                Content = $"クリップボード画像の処理に失敗しました: {ex.Message}",
+                IsUser = false,
+                Timestamp = DateTime.Now
+            });
+            StateHasChanged();
+        }
+    }
+    
+    /// <summary>
+    /// Parse AI response for UI update instructions
+    /// Supports both product updates and travel expense form updates
+    /// Example format: "EXPENSE_UPDATE: applicant=田中太郎, destination=大阪, transportCost=15000"
+    /// </summary>
+    private void ParseAndExecuteUIInstructions(string aiResponse)
+    {
+        try
+        {
+            var lines = aiResponse.Split('\n');
+            foreach (var line in lines)
+            {
+                // 旅費申請フォームの更新をチェック
+                if (line.Trim().StartsWith("EXPENSE_UPDATE:", StringComparison.OrdinalIgnoreCase))
+                {
+                    ParseTravelExpenseUpdate(line);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error parsing UI instructions: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// 旅費申請フォームの更新を解析
+    /// </summary>
+    private void ParseTravelExpenseUpdate(string line)
+    {
+        try
+        {
+            Console.WriteLine($"✅ Parsing EXPENSE_UPDATE: {line}");
+            
+            var instructionPart = line.Substring(line.IndexOf(':') + 1).Trim();
+            var parameters = instructionPart.Split(',')
+                .Select(p => p.Trim().Split('='))
+                .Where(p => p.Length == 2)
+                .ToDictionary(p => p[0].Trim().ToLowerInvariant(), p => p[1].Trim());
+            
+            Console.WriteLine($"📋 Parsed {parameters.Count} parameters");
+            
+            var instruction = new TravelExpenseUIUpdateInstruction();
+            
+            // 申請者名：指定がない場合はデフォルト値を設定
+            if (parameters.TryGetValue("applicant", out var applicant))
+                instruction.ApplicantName = applicant;
+            else
+                instruction.ApplicantName = "田中 太郎"; // テスト用デフォルト値
+                
+            if (parameters.TryGetValue("destination", out var destination))
+                instruction.Destination = destination;
+                
+            if (parameters.TryGetValue("purpose", out var purpose))
+                instruction.Purpose = purpose;
+                
+            // 出張日の解析：単一の日付または "yyyy-MM-dd to yyyy-MM-dd" 形式
+            if (parameters.TryGetValue("traveldate", out var travelDateStr))
+            {
+                // "to" を含む場合は範囲指定
+                if (travelDateStr.Contains(" to ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var dates = travelDateStr.Split(new[] { " to " }, StringSplitOptions.RemoveEmptyEntries);
+                    if (dates.Length == 2)
+                    {
+                        var startDateStr = dates[0].Trim();
+                        // 年が指定されていない場合は現在の年を使用
+                        if (DateTime.TryParse(startDateStr, out var startDate))
+                        {
+                            // 年が正しく解析されたか確認（2桁年の場合は現在の年を使用）
+                            if (startDate.Year < 2000)
+                            {
+                                startDate = new DateTime(DateTime.Now.Year, startDate.Month, startDate.Day);
+                            }
+                            instruction.TravelDate = startDate;
+                        }
+                    }
+                }
+                else if (DateTime.TryParse(travelDateStr, out var travelDate))
+                {
+                    // 年が正しく解析されたか確認（2桁年の場合は現在の年を使用）
+                    if (travelDate.Year < 2000)
+                    {
+                        travelDate = new DateTime(DateTime.Now.Year, travelDate.Month, travelDate.Day);
+                    }
+                    instruction.TravelDate = travelDate;
+                }
+            }
+                
+            if (parameters.TryGetValue("transportcost", out var transportCostStr) && decimal.TryParse(transportCostStr, out var transportCost))
+                instruction.TransportationCost = transportCost;
+                
+            if (parameters.TryGetValue("accommodationcost", out var accommodationCostStr) && decimal.TryParse(accommodationCostStr, out var accommodationCost))
+                instruction.AccommodationCost = accommodationCost;
+                
+            if (parameters.TryGetValue("mealcost", out var mealCostStr) && decimal.TryParse(mealCostStr, out var mealCost))
+                instruction.MealCost = mealCost;
+                
+            if (parameters.TryGetValue("othercost", out var otherCostStr) && decimal.TryParse(otherCostStr, out var otherCost))
+                instruction.OtherCost = otherCost;
+            
+            // チャット履歴のサマリを備考として追加
+            instruction.Notes = GenerateChatSummary();
+            
+            Console.WriteLine($"🚀 Triggering UI update with: Destination={instruction.Destination}, TransportCost={instruction.TransportationCost}");
+            
+            // UI更新をトリガー
+            TravelExpenseUIUpdateService.RequestTravelExpenseUIUpdate(instruction);
+            
+            Console.WriteLine("✅ UI update request sent");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error parsing travel expense update: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// チャット履歴から備考用のサマリを生成
+    /// AIの最新応答から出張概要を抽出
+    /// </summary>
+    private string GenerateChatSummary()
+    {
+        if (chatHistory.Count == 0)
+            return string.Empty;
+        
+        var summary = new System.Text.StringBuilder();
+        
+        // AIの最新応答を取得（EXPENSE_UPDATE行を除外）
+        var latestAiMessage = chatHistory
+            .Where(msg => !msg.IsUser)
+            .OrderByDescending(msg => msg.Timestamp)
+            .FirstOrDefault();
+        
+        if (latestAiMessage != null)
+        {
+            // EXPENSE_UPDATE行を除外してサマリを生成
+            var lines = latestAiMessage.Content.Split('\n');
+            var summaryLines = lines
+                .Where(line => !line.Trim().StartsWith("EXPENSE_UPDATE:", StringComparison.OrdinalIgnoreCase))
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+            
+            foreach (var line in summaryLines)
+            {
+                summary.AppendLine(line.Trim());
+            }
+        }
+        
+        return summary.ToString();
+    }
+    
+}
+
+

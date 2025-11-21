@@ -49,3 +49,19 @@ h1:focus {
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
 }
+
+/* AI Agent auto-fill highlight animation */
+@keyframes highlight-fade {
+    0% {
+        background-color: #fff3cd;
+        box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.5);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: none;
+    }
+}
+
+.ai-updated {
+    animation: highlight-fade 10s ease-out;
+}

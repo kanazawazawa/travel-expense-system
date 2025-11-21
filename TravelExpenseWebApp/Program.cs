@@ -35,6 +35,11 @@ builder.Services.AddHttpClient();
 // API サービスの登録
 builder.Services.AddScoped<TravelExpenseWebApp.Services.TravelExpenseApiService>();
 
+// AI Agent サービスの登録
+builder.Services.AddSingleton<TravelExpenseWebApp.Services.TravelExpenseUIUpdateService>();
+builder.Services.AddSingleton<TravelExpenseWebApp.Services.AzureAIAgentService>();
+builder.Services.AddSingleton<TravelExpenseWebApp.Services.AgentModeService>();
+
 builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
