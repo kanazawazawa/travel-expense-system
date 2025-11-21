@@ -475,6 +475,9 @@ private string? lastKnownAgentId = null;
     private bool isAgentReady = false;
     private int initializationCountdown = 5; // seconds
     private System.Threading.Timer? countdownTimer;
+    
+    // Scroll control
+    private bool needsScrolling = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -563,8 +566,12 @@ private string? lastKnownAgentId = null;
             Console.WriteLine($"⚠️ Failed to enable clipboard paste: {ex.Message}");
         }
         
-        // Scroll to bottom whenever component rerenders
-        await ScrollToBottom();
+        // Scroll to bottom only when needed
+        if (needsScrolling)
+        {
+            await ScrollToBottom();
+            needsScrolling = false;
+        }
     }
     
     /// <summary>
@@ -653,7 +660,11 @@ private string? lastKnownAgentId = null;
             Timestamp = DateTime.Now 
         });
         
-        string userMessage = chatMessage;
+        string userMessage = chatMessage; // Save before clearing
+        chatMessage = string.Empty; // Clear input field immediately
+        needsScrolling = true; // Mark that we need to scroll
+        StateHasChanged(); // Update UI immediately to show user message
+        await Task.Delay(10); // Small delay to ensure render completes
         byte[]? fileBytes = null;
         string? fileName = null;
         string? contentType = null;
@@ -692,13 +703,11 @@ private string? lastKnownAgentId = null;
             contentType = "image/png";
         }
         
-        chatMessage = string.Empty; // Clear input field
         var fileToSend = selectedFile;
         selectedFile = null; // Clear selected file
         clipboardImageData = null; // Clear clipboard image
         clipboardImageFileName = null;
         isLoading = true;
-        StateHasChanged(); // Update UI to show user message
         
         try
         {
@@ -776,10 +785,8 @@ private string? lastKnownAgentId = null;
         finally
         {
             isLoading = false;
+            needsScrolling = true; // Mark that we need to scroll
             StateHasChanged(); // Update UI with AI response
-            
-            // Scroll to bottom of chat
-            await ScrollToBottom();
         }
     }
 
