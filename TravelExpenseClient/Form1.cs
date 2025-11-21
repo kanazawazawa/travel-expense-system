@@ -36,7 +36,24 @@ namespace TravelExpenseClient
         {
             var currentUrl = GetCurrentApiUrl();
             var environment = GetEnvironmentName(currentUrl);
-            this.Text = $"旅費精算管理システム - [{environment}]";
+            var version = GetApplicationVersion();
+            this.Text = $"旅費精算管理システム v{version} - [{environment}] - {currentUrl}";
+        }
+
+        /// <summary>
+        /// アプリケーションのバージョンを取得
+        /// </summary>
+        private string GetApplicationVersion()
+        {
+            try
+            {
+                var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                return version != null ? $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}" : "不明";
+            }
+            catch
+            {
+                return "不明";
+            }
         }
 
         /// <summary>
