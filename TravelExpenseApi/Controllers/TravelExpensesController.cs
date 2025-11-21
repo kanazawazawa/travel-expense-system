@@ -8,7 +8,7 @@ namespace TravelExpenseApi.Controllers;
 /// <summary>
 /// 旅費申請API
 /// </summary>
-[Authorize]
+// [Authorize]  // 一時的に無効化（デモ用）
 [ApiController]
 [Route("api/[controller]")]
 public class TravelExpensesController : ControllerBase

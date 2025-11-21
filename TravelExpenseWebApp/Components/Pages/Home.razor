@@ -1,0 +1,44 @@
+@page "/"
+@* @attribute [Microsoft.AspNetCore.Authorization.Authorize] *@
+
+<PageTitle>旅費精算管理システム</PageTitle>
+
+<h1>旅費精算管理システム</h1>
+
+<div class="alert alert-info">
+    <h4>ようこそ！</h4>
+    <p>このシステムでは、出張に関する旅費精算の申請・管理ができます。</p>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-list-task"></i> 旅費精算一覧
+                </h5>
+                <p class="card-text">登録済みの旅費精算を確認できます。</p>
+                <a href="/expenses" class="btn btn-primary">一覧を見る</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-plus-circle"></i> 新規登録
+                </h5>
+                <p class="card-text">新しい旅費精算を申請できます。</p>
+                <a href="/expenses/create" class="btn btn-success">新規登録</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<AuthorizeView>
+    <Authorized Context="authContext">
+        <div class="mt-4">
+            <p>ログイン中: <strong>@authContext.User?.Identity?.Name</strong></p>
+        </div>
+    </Authorized>
+</AuthorizeView>

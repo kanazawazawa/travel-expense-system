@@ -1,0 +1,159 @@
+@page "/expenses/create"
+@using TravelExpenseWebApp.Models
+@using TravelExpenseWebApp.Services
+@inject TravelExpenseApiService ApiService
+@inject NavigationManager Navigation
+@* @attribute [Microsoft.AspNetCore.Authorization.Authorize] *@
+
+<PageTitle>旅費精算 - 新規登録</PageTitle>
+
+<h1>旅費精算 - 新規登録</h1>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<EditForm Model="@request" OnValidSubmit="HandleSubmit" FormName="ExpenseCreateForm">
+<DataAnnotationsValidator />
+<ValidationSummary />
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">申請者名 *</label>
+                <InputText class="form-control" @bind-Value="request.ApplicantName" />
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">出張日 *</label>
+                <InputDate class="form-control" @bind-Value="request.TravelDate" />
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">出張先 *</label>
+                <InputText class="form-control" @bind-Value="request.Destination" />
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label class="form-label">交通手段 *</label>
+                <InputSelect class="form-control" @bind-Value="request.Transportation">
+                    <option value="">-- 選択してください --</option>
+                    <option value="新幹線">新幹線</option>
+                    <option value="飛行機">飛行機</option>
+                    <option value="電車">電車</option>
+                    <option value="バス">バス</option>
+                    <option value="タクシー">タクシー</option>
+                    <option value="自家用車">自家用車</option>
+                    <option value="その他">その他</option>
+                </InputSelect>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">目的 *</label>
+        <InputTextArea class="form-control" rows="3" @bind-Value="request.Purpose" />
+    </div>
+
+    <div class="row">
+        <div class="col-md-3">
+            <div class="mb-3">
+                <label class="form-label">交通費</label>
+                <InputNumber class="form-control" @bind-Value="request.TransportationCost" />
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="mb-3">
+                <label class="form-label">宿泊費</label>
+                <InputNumber class="form-control" @bind-Value="request.AccommodationCost" />
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="mb-3">
+                <label class="form-label">食事代</label>
+                <InputNumber class="form-control" @bind-Value="request.MealCost" />
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="mb-3">
+                <label class="form-label">その他</label>
+                <InputNumber class="form-control" @bind-Value="request.OtherCost" />
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">合計金額</label>
+        <div class="form-control-plaintext fw-bold fs-4">
+            @TotalAmount.ToString("N0") 円
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">備考</label>
+        <InputTextArea class="form-control" rows="3" @bind-Value="request.Remarks" />
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+            @if (isSubmitting)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            登録
+        </button>
+        <button type="button" class="btn btn-secondary" @onclick="Cancel">キャンセル</button>
+    </div>
+</EditForm>
+
+@code {
+[SupplyParameterFromForm]
+private TravelExpenseRequest request { get; set; } = new()
+{
+    TravelDate = DateTime.Now,
+    TransportationCost = 0,
+    AccommodationCost = 0,
+    MealCost = 0,
+    OtherCost = 0
+};
+
+    private bool isSubmitting = false;
+    private string? errorMessage;
+
+    private int TotalAmount =>
+        request.TransportationCost +
+        request.AccommodationCost +
+        request.MealCost +
+        request.OtherCost;
+
+    private async Task HandleSubmit()
+    {
+        try
+        {
+            isSubmitting = true;
+            errorMessage = null;
+            await ApiService.CreateExpenseAsync(request);
+            Navigation.NavigateTo("/expenses");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"登録に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/expenses");
+    }
+}
