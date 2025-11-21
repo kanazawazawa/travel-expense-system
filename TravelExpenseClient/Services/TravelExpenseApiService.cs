@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.Extensions.Configuration;
 using TravelExpenseClient.Models;
 
 namespace TravelExpenseClient.Services;
@@ -11,15 +12,16 @@ public class TravelExpenseApiService
 {
     private readonly HttpClient _httpClient;
     private readonly AuthenticationService? _authService;
-    // ローカルAPI（認証あり）
-    private const string BaseUrl = "https://localhost:7115/api/TravelExpenses";
-    // Azure API（認証なし）- 必要に応じて切り替え
-    // private const string BaseUrl = "https://app-20251120-api.azurewebsites.net/api/TravelExpenses";
+    private readonly string _baseUrl;
+
+    // デフォルトのURL（設定ファイルが読めない場合のフォールバック）
+    private const string DefaultBaseUrl = "https://localhost:7115/api/TravelExpenses";
 
     // 認証なしのコンストラクタ（後方互換性のため）
     public TravelExpenseApiService()
     {
         _httpClient = new HttpClient();
+        _baseUrl = LoadBaseUrlFromConfig();
     }
 
     // 認証ありのコンストラクタ（推奨）
@@ -27,6 +29,28 @@ public class TravelExpenseApiService
     {
         _httpClient = new HttpClient();
         _authService = authService;
+        _baseUrl = LoadBaseUrlFromConfig();
+    }
+
+    /// <summary>
+    /// appsettings.json からベースURLを読み込む
+    /// </summary>
+    private static string LoadBaseUrlFromConfig()
+    {
+        try
+        {
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .Build();
+
+            return configuration["ApiSettings:BaseUrl"] ?? DefaultBaseUrl;
+        }
+        catch
+        {
+            // 設定ファイルが読めない場合はデフォルト値を使用
+            return DefaultBaseUrl;
+        }
     }
 
     /// <summary>
@@ -51,7 +75,7 @@ public class TravelExpenseApiService
     public async Task<List<TravelExpenseResponse>> GetAllExpensesAsync()
     {
         await SetAuthorizationHeaderAsync();
-        var response = await _httpClient.GetAsync(BaseUrl);
+        var response = await _httpClient.GetAsync(_baseUrl);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<List<TravelExpenseResponse>>() ?? new List<TravelExpenseResponse>();
     }
@@ -62,7 +86,7 @@ public class TravelExpenseApiService
     public async Task<TravelExpenseResponse?> GetExpenseByIdAsync(string partitionKey, string rowKey)
     {
         await SetAuthorizationHeaderAsync();
-        var response = await _httpClient.GetAsync($"{BaseUrl}/{partitionKey}/{rowKey}");
+        var response = await _httpClient.GetAsync($"{_baseUrl}/{partitionKey}/{rowKey}");
         
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -79,7 +103,7 @@ public class TravelExpenseApiService
     public async Task<TravelExpenseResponse> CreateExpenseAsync(TravelExpenseRequest request)
     {
         await SetAuthorizationHeaderAsync();
-        var response = await _httpClient.PostAsJsonAsync(BaseUrl, request);
+        var response = await _httpClient.PostAsJsonAsync(_baseUrl, request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseResponse>() ?? throw new Exception("Failed to create expense");
     }
@@ -90,7 +114,7 @@ public class TravelExpenseApiService
     public async Task<TravelExpenseResponse> UpdateExpenseAsync(string partitionKey, string rowKey, TravelExpenseRequest request)
     {
         await SetAuthorizationHeaderAsync();
-        var response = await _httpClient.PutAsJsonAsync($"{BaseUrl}/{partitionKey}/{rowKey}", request);
+        var response = await _httpClient.PutAsJsonAsync($"{_baseUrl}/{partitionKey}/{rowKey}", request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseResponse>() ?? throw new Exception("Failed to update expense");
     }
@@ -101,7 +125,7 @@ public class TravelExpenseApiService
     public async Task<TravelExpenseResponse> UpdateStatusAsync(string partitionKey, string rowKey, string status)
     {
         await SetAuthorizationHeaderAsync();
-        var response = await _httpClient.PatchAsJsonAsync($"{BaseUrl}/{partitionKey}/{rowKey}/status", status);
+        var response = await _httpClient.PatchAsJsonAsync($"{_baseUrl}/{partitionKey}/{rowKey}/status", status);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseResponse>() ?? throw new Exception("Failed to update status");
     }
@@ -112,7 +136,7 @@ public class TravelExpenseApiService
     public async Task<bool> DeleteExpenseAsync(string partitionKey, string rowKey)
     {
         await SetAuthorizationHeaderAsync();
-        var response = await _httpClient.DeleteAsync($"{BaseUrl}/{partitionKey}/{rowKey}");
+        var response = await _httpClient.DeleteAsync($"{_baseUrl}/{partitionKey}/{rowKey}");
         
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -129,7 +153,7 @@ public class TravelExpenseApiService
     public async Task<TravelExpenseSummary> GetSummaryAsync()
     {
         await SetAuthorizationHeaderAsync();
-        var response = await _httpClient.GetAsync($"{BaseUrl}/summary");
+        var response = await _httpClient.GetAsync($"{_baseUrl}/summary");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseSummary>() ?? new TravelExpenseSummary();
     }
