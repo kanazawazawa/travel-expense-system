@@ -5,11 +5,22 @@ using TravelExpenseWebApp.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Azure AD認証の追加（一時的に無効化）
-// builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
-//     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
+// Azure AD認証の追加 (ダウンストリームAPIへのアクセスを有効化)
+builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApp(options =>
+    {
+        builder.Configuration.Bind("AzureAd", options);
+        // アカウント選択を常に表示
+        options.Events.OnRedirectToIdentityProvider = context =>
+        {
+            context.ProtocolMessage.Prompt = "select_account";
+            return Task.CompletedTask;
+        };
+    })
+    .EnableTokenAcquisitionToCallDownstreamApi()
+    .AddInMemoryTokenCaches();
 
-// builder.Services.AddAuthorization();
+builder.Services.AddAuthorization();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -40,8 +51,8 @@ app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 
-// app.UseAuthentication();
-// app.UseAuthorization();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseAntiforgery();
 
