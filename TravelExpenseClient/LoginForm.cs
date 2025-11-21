@@ -52,5 +52,11 @@ namespace TravelExpenseClient
                 buttonCancel.Enabled = true;
             }
         }
+
+        private void ButtonSettings_Click(object sender, EventArgs e)
+        {
+            var settingsForm = new SettingsForm();
+            settingsForm.ShowDialog(this);
+        }
     }
 }

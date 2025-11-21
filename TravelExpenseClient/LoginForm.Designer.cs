@@ -32,6 +32,7 @@ namespace TravelExpenseClient
             this.labelDescription = new System.Windows.Forms.Label();
             this.buttonSignIn = new System.Windows.Forms.Button();
             this.buttonCancel = new System.Windows.Forms.Button();
+            this.buttonSettings = new System.Windows.Forms.Button();
             this.pictureBoxLogo = new System.Windows.Forms.PictureBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxLogo)).BeginInit();
             this.SuspendLayout();
@@ -83,6 +84,18 @@ namespace TravelExpenseClient
             this.buttonCancel.Text = "キャンセル";
             this.buttonCancel.UseVisualStyleBackColor = true;
             // 
+            // buttonSettings
+            // 
+            this.buttonSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.buttonSettings.Font = new System.Drawing.Font("Yu Gothic UI", 8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.buttonSettings.Location = new System.Drawing.Point(80, 260);
+            this.buttonSettings.Name = "buttonSettings";
+            this.buttonSettings.Size = new System.Drawing.Size(240, 30);
+            this.buttonSettings.TabIndex = 4;
+            this.buttonSettings.Text = "⚙ API設定";
+            this.buttonSettings.UseVisualStyleBackColor = true;
+            this.buttonSettings.Click += new System.EventHandler(this.ButtonSettings_Click);
+            // 
             // pictureBoxLogo
             // 
             this.pictureBoxLogo.Location = new System.Drawing.Point(170, 260);
@@ -98,7 +111,8 @@ namespace TravelExpenseClient
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.White;
             this.CancelButton = this.buttonCancel;
-            this.ClientSize = new System.Drawing.Size(400, 330);
+            this.ClientSize = new System.Drawing.Size(400, 360);
+            this.Controls.Add(this.buttonSettings);
             this.Controls.Add(this.pictureBoxLogo);
             this.Controls.Add(this.buttonCancel);
             this.Controls.Add(this.buttonSignIn);
@@ -122,6 +136,7 @@ namespace TravelExpenseClient
         private System.Windows.Forms.Label labelDescription;
         private System.Windows.Forms.Button buttonSignIn;
         private System.Windows.Forms.Button buttonCancel;
+        private System.Windows.Forms.Button buttonSettings;
         private System.Windows.Forms.PictureBox pictureBoxLogo;
     }
 }
