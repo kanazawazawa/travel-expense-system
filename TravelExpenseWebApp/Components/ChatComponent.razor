@@ -708,6 +708,7 @@ private string? lastKnownAgentId = null;
         clipboardImageData = null; // Clear clipboard image
         clipboardImageFileName = null;
         isLoading = true;
+        StateHasChanged(); // Update UI to show typing indicator
         
         try
         {
