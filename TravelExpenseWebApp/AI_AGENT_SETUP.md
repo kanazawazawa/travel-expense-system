@@ -75,8 +75,28 @@ az login
 ### 4. アクセス権限の設定
 
 AI Foundryプロジェクトで、使用するAzureアカウントまたはManaged Identityに適切なロールを付与：
-- **Cognitive Services OpenAI User** または
-- **Cognitive Services Contributor**
+- **Azure AI Developer** （推奨）
+- **Azure AI User**
+
+#### 本番環境（Azure App Service）の場合
+
+1. **Managed Identityを有効化**
+   - Azure Portal → App Service → **ID** → システム割り当て済みを**オン**
+
+2. **AI Foundryプロジェクトに権限付与**
+   - Azure Portal → AI Foundry プロジェクト → **アクセス制御 (IAM)**
+   - **ロールの割り当てを追加** → **Azure AI Developer**
+   - メンバー: App ServiceのManaged Identityを選択
+
+3. **権限の伝播を待つ**
+   - 権限付与後、**1～5分程度**待ってから動作確認
+   - すぐに動作しない場合は、App Serviceを再起動してトークンキャッシュをクリア
+
+4. **環境変数を設定**
+   - Azure Portal → App Service → **構成** → **アプリケーション設定**
+   - `AzureAIAgent__ProjectEndpoint`: `https://yourproject.services.ai.azure.com/api/projects/yourproject`
+   - `AzureAIAgent__AgentId`: `asst_xxxxxxxxxxxxx`
+   - ⚠️ 注意: コロンではなく**ダブルアンダースコア** `__` を使用
 
 ## 使用方法
 
@@ -159,8 +179,12 @@ EXPENSE_UPDATE: destination=出張先, traveldate=YYYY-MM-DD to YYYY-MM-DD, purp
 - ProjectEndpointとAgentIdが正しく設定されているか確認
 
 ### 認証エラー
-- `az login`でAzure CLIにログインしているか確認
-- AI Foundryプロジェクトへのアクセス権限を確認
+- **ローカル開発環境**: `az login`でAzure CLIにログインしているか確認
+- **Azure App Service**: 
+  - Managed Identityが有効化されているか確認
+  - AI Foundryプロジェクトに**Azure AI Developer**ロールが付与されているか確認
+  - 権限付与後、**1～5分待ってから再試行**
+  - App Serviceを再起動してトークンキャッシュをクリア
 
 ### チャットからフォームに反映されない
 - ブラウザのコンソールでエラーを確認

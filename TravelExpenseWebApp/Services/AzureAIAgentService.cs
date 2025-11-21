@@ -73,15 +73,42 @@ namespace TravelExpenseWebApp.Services
 
                 try
                 {
-                    var credential = new DefaultAzureCredential();
+                    _logger.LogInformation("Initializing Azure AI Projects client...");
+                    _logger.LogInformation("Project Endpoint: {Endpoint}", _projectEndpoint);
+                    _logger.LogInformation("Agent ID: {AgentId}", _agentId);
+                    
+                    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+                    {
+                        ExcludeEnvironmentCredential = false,
+                        ExcludeManagedIdentityCredential = false,
+                        ExcludeSharedTokenCacheCredential = false,
+                        ExcludeVisualStudioCredential = false,
+                        ExcludeVisualStudioCodeCredential = false,
+                        ExcludeAzureCliCredential = false,
+                        ExcludeAzurePowerShellCredential = false,
+                        ExcludeInteractiveBrowserCredential = true // Disable browser pop-up in production
+                    });
+                    
                     _projectClient = new AIProjectClient(new Uri(_projectEndpoint!), credential);
                     _agentsClient = _projectClient.GetPersistentAgentsClient();
                     _isInitialized = true;
-                    _logger.LogInformation("? Azure AI Projects client initialized (GetPersistentAgentsClient)");
+                    _logger.LogInformation("✅ Azure AI Projects client initialized successfully (GetPersistentAgentsClient)");
+                }
+                catch (Azure.Identity.AuthenticationFailedException authEx)
+                {
+                    _logger.LogError(authEx, "❌ Authentication failed. Please ensure proper Azure credentials are configured.");
+                    _logger.LogError("Authentication error details: {Message}", authEx.Message);
+                    _logger.LogError("Please check: 1) Azure CLI login (az login), 2) Visual Studio account, 3) Managed Identity permissions");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error initializing Azure AI Projects client");
+                    _logger.LogError(ex, "❌ Error initializing Azure AI Projects client");
+                    _logger.LogError("Error type: {Type}", ex.GetType().Name);
+                    _logger.LogError("Error message: {Message}", ex.Message);
+                    if (ex.InnerException != null)
+                    {
+                        _logger.LogError("Inner exception: {InnerMessage}", ex.InnerException.Message);
+                    }
                 }
             }
         }
