@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using TravelExpenseClient.Models;
 using TravelExpenseClient.Services;
 
@@ -18,11 +19,67 @@ namespace TravelExpenseClient
             InitializeComponent();
             _authService = authService;
             _apiService = new TravelExpenseApiService(authService);
+            
+            // タイトルバーに接続先を表示
+            UpdateFormTitle();
         }
 
         private async void Form1_Load(object sender, EventArgs e)
         {
             await LoadDataAsync();
+        }
+
+        /// <summary>
+        /// フォームタイトルに接続先を表示
+        /// </summary>
+        private void UpdateFormTitle()
+        {
+            var currentUrl = GetCurrentApiUrl();
+            var environment = GetEnvironmentName(currentUrl);
+            this.Text = $"旅費精算管理システム - [{environment}]";
+        }
+
+        /// <summary>
+        /// 現在のAPIエンドポイントを取得
+        /// </summary>
+        private string GetCurrentApiUrl()
+        {
+            try
+            {
+                var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+                    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .Build();
+
+                return configuration["ApiSettings:BaseUrl"] ?? "不明";
+            }
+            catch
+            {
+                return "不明";
+            }
+        }
+
+        /// <summary>
+        /// URLから環境名を判定
+        /// </summary>
+        private string GetEnvironmentName(string url)
+        {
+            if (url.Contains("localhost"))
+            {
+                return "ローカル環境";
+            }
+            else if (url.Contains("azurewebsites.net"))
+            {
+                return "Azure環境";
+            }
+            else if (url == "不明")
+            {
+                return "接続先不明";
+            }
+            else
+            {
+                return "カスタム環境";
+            }
         }
 
         private async Task LoadDataAsync()
