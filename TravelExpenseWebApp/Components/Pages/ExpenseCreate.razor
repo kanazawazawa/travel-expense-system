@@ -1,9 +1,12 @@
 @page "/expenses/create"
 @using TravelExpenseWebApp.Models
 @using TravelExpenseWebApp.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @inject TravelExpenseApiService ApiService
 @inject NavigationManager Navigation
 @inject TravelExpenseUIUpdateService TravelExpenseUIUpdateService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @implements IDisposable
 @rendermode InteractiveServer
@@ -33,7 +36,7 @@
         <div class="col-md-6">
             <div class="mb-3">
                 <label class="form-label">申請者名 *</label>
-                <InputText class="@($"form-control {GetFieldClass("ApplicantName")}")" @bind-Value="request.ApplicantName" />
+                <InputText class="@($"form-control {GetFieldClass("ApplicantName")}")" @bind-Value="request.ApplicantName" readonly />
             </div>
         </div>
         <div class="col-md-6">
@@ -163,83 +166,120 @@ private string GetFieldClass(string fieldName)
     return highlightedFields.Contains(fieldName) ? "ai-updated" : "";
 }
 
-protected override void OnInitialized()
+protected override async Task OnInitializedAsync()
 {
     Console.WriteLine("🔧 ExpenseCreate: Registering event handler");
     TravelExpenseUIUpdateService.TravelExpenseUIUpdateRequested += HandleTravelExpenseUIUpdate;
     Console.WriteLine("✅ ExpenseCreate: Event handler registered");
+    
+    // Entra IDからログインユーザーの氏名を取得
+    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+    var user = authState.User;
+    
+    if (user.Identity?.IsAuthenticated == true)
+    {
+        // 氏名の取得を試みる（優先順位順）
+        var displayName = user.FindFirst("name")?.Value 
+                       ?? user.FindFirst(ClaimTypes.Name)?.Value
+                       ?? user.FindFirst("preferred_username")?.Value
+                       ?? user.Identity.Name
+                       ?? "不明なユーザー";
+        
+        request.ApplicantName = displayName;
+        Console.WriteLine($"✅ ログインユーザー: {displayName}");
+    }
 }
 
 private void HandleTravelExpenseUIUpdate(TravelExpenseUIUpdateInstruction instruction)
 {
     Console.WriteLine("🎯 ExpenseCreate: Received UI update event!");
-    Console.WriteLine($"   Destination: {instruction.Destination}");
-    Console.WriteLine($"   TransportCost: {instruction.TransportationCost}");
+    
+    // 更新される項目をカウント
+    int updatedFieldsCount = 0;
     
     // Clear previous highlights
     highlightedFields.Clear();
     
-    if (!string.IsNullOrEmpty(instruction.ApplicantName))
-    {
-        request.ApplicantName = instruction.ApplicantName;
-        highlightedFields.Add("ApplicantName");
-    }
+    // 申請者名はEntra IDから取得するため、AIエージェントからの更新は無視
+    // if (!string.IsNullOrEmpty(instruction.ApplicantName))
+    // {
+    //     request.ApplicantName = instruction.ApplicantName;
+    //     highlightedFields.Add("ApplicantName");
+    // }
 
     if (instruction.TravelDate.HasValue)
     {
         request.TravelDate = instruction.TravelDate.Value;
         highlightedFields.Add("TravelDate");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ 出張日: {instruction.TravelDate.Value:yyyy-MM-dd}");
     }
 
     if (!string.IsNullOrEmpty(instruction.Destination))
     {
         request.Destination = instruction.Destination;
         highlightedFields.Add("Destination");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ 出張先: {instruction.Destination}");
     }
 
     if (!string.IsNullOrEmpty(instruction.Transportation))
     {
         request.Transportation = instruction.Transportation;
         highlightedFields.Add("Transportation");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ 交通手段: {instruction.Transportation}");
     }
 
     if (!string.IsNullOrEmpty(instruction.Purpose))
     {
         request.Purpose = instruction.Purpose;
         highlightedFields.Add("Purpose");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ 目的: {instruction.Purpose}");
     }
 
     if (instruction.TransportationCost.HasValue)
     {
         request.TransportationCost = (int)instruction.TransportationCost.Value;
         highlightedFields.Add("TransportationCost");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ 交通費: {instruction.TransportationCost.Value:N0}円");
     }
 
     if (instruction.AccommodationCost.HasValue)
     {
         request.AccommodationCost = (int)instruction.AccommodationCost.Value;
         highlightedFields.Add("AccommodationCost");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ 宿泊費: {instruction.AccommodationCost.Value:N0}円");
     }
 
     if (instruction.MealCost.HasValue)
     {
         request.MealCost = (int)instruction.MealCost.Value;
         highlightedFields.Add("MealCost");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ 食事代: {instruction.MealCost.Value:N0}円");
     }
 
     if (instruction.OtherCost.HasValue)
     {
         request.OtherCost = (int)instruction.OtherCost.Value;
         highlightedFields.Add("OtherCost");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ その他: {instruction.OtherCost.Value:N0}円");
     }
 
     if (!string.IsNullOrEmpty(instruction.Notes))
     {
         request.Remarks = instruction.Notes;
         highlightedFields.Add("Remarks");
+        updatedFieldsCount++;
+        Console.WriteLine($"   ✅ 備考: {instruction.Notes.Substring(0, Math.Min(50, instruction.Notes.Length))}...");
     }
 
-    Console.WriteLine("✅ ExpenseCreate: Form updated, calling StateHasChanged");
+    Console.WriteLine($"✅ ExpenseCreate: {updatedFieldsCount}個のフィールドを更新しました");
     InvokeAsync(StateHasChanged);
     
     // Remove highlights after 10 seconds
@@ -270,9 +310,11 @@ public void Dispose()
             // 成功メッセージを表示
             successMessage = "登録が完了しました！";
             
-            // フォームをリセット
+            // 申請者名を保持してフォームをリセット
+            var currentApplicantName = request.ApplicantName;
             request = new TravelExpenseRequest
             {
+                ApplicantName = currentApplicantName,
                 TravelDate = DateTime.Now,
                 TransportationCost = 0,
                 AccommodationCost = 0,

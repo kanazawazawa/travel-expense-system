@@ -17,10 +17,10 @@
             <div>
                 <h5 class="mb-0">旅費申請アシスタント</h5>
                 @{
-                    var currentAgentId = AzureAIAgentService.GetCurrentAgentId();
-                    if (!string.IsNullOrEmpty(currentAgentId))
+                    var currentAgentName = AzureAIAgentService.GetCurrentAgentName();
+                    if (!string.IsNullOrEmpty(currentAgentName))
                     {
-                        var shortId = currentAgentId.Length > 8 ? currentAgentId.Substring(0, 8) + "..." : currentAgentId;
+                        var shortId = currentAgentName.Length > 8 ? currentAgentName.Substring(0, 8) + "..." : currentAgentName;
                         <small class="text-muted">Agent: @shortId</small>
                     }
                     else
@@ -44,19 +44,19 @@
             <div class="agent-settings mt-2 p-2 border rounded bg-light">
                 <div class="row align-items-center mb-2">
                     <div class="col-auto">
-                        <small class="text-muted">Current Agent ID:</small>
+                        <small class="text-muted">Current Agent Name:</small>
                     </div>
                     <div class="col">
-                        <code class="small bg-white px-2 py-1 rounded border @(AzureAIAgentService.IsAgentIdModified() ? "border-warning" : "")">
-                            @(AzureAIAgentService.GetCurrentAgentId() ?? "Not set")
+                        <code class="small bg-white px-2 py-1 rounded border @(AzureAIAgentService.IsAgentNameModified() ? "border-warning" : "")">
+                            @(AzureAIAgentService.GetCurrentAgentName() ?? "Not set")
                         </code>
-                        @if (AzureAIAgentService.IsAgentIdModified())
+                        @if (AzureAIAgentService.IsAgentNameModified())
                         {
                             <small class="text-warning ms-2"><i class="bi bi-exclamation-triangle"></i> Modified</small>
                         }
                     </div>
                 </div>
-                @if (!string.IsNullOrEmpty(AzureAIAgentService.GetOriginalAgentId()))
+                @if (!string.IsNullOrEmpty(AzureAIAgentService.GetOriginalAgentName()))
                 {
                     <div class="row align-items-center mb-2">
                         <div class="col-auto">
@@ -64,20 +64,20 @@
                         </div>
                         <div class="col">
                             <code class="small bg-light px-2 py-1 rounded border text-muted">
-                                @AzureAIAgentService.GetOriginalAgentId()
+                                @AzureAIAgentService.GetOriginalAgentName()
                             </code>
                         </div>
                     </div>
                 }
                 <div class="row align-items-center">
                     <div class="col-auto">
-                        <small class="text-muted">New Agent ID:</small>
+                        <small class="text-muted">New Agent Name:</small>
                     </div>
                     <div class="col">
-                        <input type="text" class="form-control form-control-sm" @bind="tempAgentId" placeholder="Enter Agent ID" />
+                        <input type="text" class="form-control form-control-sm" @bind="tempAgentName" placeholder="Enter Agent Name" />
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-sm btn-success" @onclick="UpdateAgentId" disabled="@string.IsNullOrWhiteSpace(tempAgentId)">
+                        <button class="btn btn-sm btn-success" @onclick="UpdateAgentId" disabled="@string.IsNullOrWhiteSpace(tempAgentName)">
                             <i class="bi bi-check"></i>
                         </button>
                         <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelAgentSettings">
@@ -123,6 +123,28 @@
                             else
                             {
                                 <p>@msg.Content</p>
+                            }
+                            
+                            @* EXPENSE_UPDATE行がある場合は折りたたみ可能にする *@
+                            @if (HasExpenseUpdate(msg.Content))
+                            {
+                                var expenseUpdates = GetExpenseUpdates(msg.Content);
+                                var messageId = $"msg-{msg.Timestamp.Ticks}";
+                                <div class="expense-update-section">
+                                    <button class="btn-show-details" @onclick="() => ToggleExpenseUpdateVisibility(messageId)">
+                                        <i class="bi @(IsExpenseUpdateVisible(messageId) ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                        @(IsExpenseUpdateVisible(messageId) ? "技術情報を隠す" : "技術情報を表示")
+                                    </button>
+                                    @if (IsExpenseUpdateVisible(messageId))
+                                    {
+                                        <div class="expense-update-details">
+                                            @foreach (var update in expenseUpdates)
+                                            {
+                                                <code>@update</code>
+                                            }
+                                        </div>
+                                    }
+                                </div>
                             }
                         }
                     </div>
@@ -447,6 +469,56 @@
             transform: scale(1);
         }
     }
+    
+    /* EXPENSE_UPDATE details section */
+    .expense-update-section {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed #dee2e6;
+    }
+    
+    .btn-show-details {
+        background: none;
+        border: none;
+        color: #6c757d;
+        font-size: 0.85rem;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.2s;
+    }
+    
+    .btn-show-details:hover {
+        background-color: #f8f9fa;
+        color: #0d6efd;
+    }
+    
+    .btn-show-details i {
+        font-size: 0.9rem;
+    }
+    
+    .expense-update-details {
+        margin-top: 8px;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border-left: 3px solid #0d6efd;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.8rem;
+    }
+    
+    .expense-update-details code {
+        display: block;
+        padding: 4px 8px;
+        margin: 2px 0;
+        background-color: #e9ecef;
+        border-radius: 3px;
+        color: #495057;
+        word-break: break-all;
+    }
 </style>
 
 @code {
@@ -457,10 +529,13 @@ private string? currentThreadId;
     
 // Agent settings variables
 private bool showAgentSettings = false;
-private string tempAgentId = string.Empty;
+private string tempAgentName = string.Empty;
 private string agentSettingsMessage = string.Empty;
 private bool agentSettingsSuccess = false;
-private string? lastKnownAgentId = null;
+private string? lastKnownAgentName = null;
+    
+// EXPENSE_UPDATE visibility tracking
+private HashSet<string> visibleExpenseUpdates = new();
     
     // File upload variables
     private InputFile? inputFile;
@@ -484,9 +559,9 @@ private string? lastKnownAgentId = null;
         // Initialize with the current thread ID if available
         currentThreadId = AgentModeService.CurrentThreadId;
         
-        // Initialize temp agent ID with current value
-        tempAgentId = AzureAIAgentService.GetCurrentAgentId() ?? string.Empty;
-        lastKnownAgentId = tempAgentId;
+        // Initialize temp Agent Name with current value
+        tempAgentName = AzureAIAgentService.GetCurrentAgentName() ?? string.Empty;
+        lastKnownAgentName = tempAgentName;
         
         // Subscribe to agent ready events
         AgentModeService.OnAgentReadyChanged += HandleAgentReadyChanged;
@@ -538,12 +613,12 @@ private string? lastKnownAgentId = null;
 
     protected override void OnAfterRender(bool firstRender)
     {
-        // Check if Agent ID has changed (e.g., after reconnection)
-        var currentAgentId = AzureAIAgentService.GetCurrentAgentId();
-        if (currentAgentId != lastKnownAgentId)
+        // Check if Agent Name has changed (e.g., after reconnection)
+        var currentAgentName = AzureAIAgentService.GetCurrentAgentName();
+        if (currentAgentName != lastKnownAgentName)
         {
-            lastKnownAgentId = currentAgentId;
-            tempAgentId = currentAgentId ?? string.Empty;
+            lastKnownAgentName = currentAgentName;
+            tempAgentName = currentAgentName ?? string.Empty;
             StateHasChanged();
         }
     }
@@ -813,7 +888,19 @@ private string? lastKnownAgentId = null;
 
     private string FormatAgentResponse(string response)
     {
-        // Format the response for better HTML display
+        // EXPENSE_UPDATE行を除外
+        var lines = response.Split('\n');
+        var filteredLines = lines
+            .Where(line => !line.Trim().StartsWith("EXPENSE_UPDATE:", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        
+        response = string.Join("\n", filteredLines);
+        
+        // フィルタ後に空になった場合はデフォルトメッセージを返す
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return "フォームを更新しました。";
+        }
         
         // Handle markdown-style bold text (convert **text** to <strong>text</strong>)
         response = System.Text.RegularExpressions.Regex.Replace(
@@ -826,6 +913,54 @@ private string? lastKnownAgentId = null;
             .Replace("\n\n", "<br><br>")
             .Replace("\n", "<br>")
             .Replace("•", "<br>•");
+    }
+    
+    /// <summary>
+    /// メッセージにEXPENSE_UPDATE行が含まれているかチェック
+    /// </summary>
+    private bool HasExpenseUpdate(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return false;
+            
+        return content.Contains("EXPENSE_UPDATE:", StringComparison.OrdinalIgnoreCase);
+    }
+    
+    /// <summary>
+    /// メッセージからEXPENSE_UPDATE行のリストを取得
+    /// </summary>
+    private List<string> GetExpenseUpdates(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return new List<string>();
+            
+        return content.Split('\n')
+            .Where(line => line.Trim().StartsWith("EXPENSE_UPDATE:", StringComparison.OrdinalIgnoreCase))
+            .Select(line => line.Trim())
+            .ToList();
+    }
+    
+    /// <summary>
+    /// EXPENSE_UPDATEの表示/非表示を切り替え
+    /// </summary>
+    private void ToggleExpenseUpdateVisibility(string messageId)
+    {
+        if (visibleExpenseUpdates.Contains(messageId))
+        {
+            visibleExpenseUpdates.Remove(messageId);
+        }
+        else
+        {
+            visibleExpenseUpdates.Add(messageId);
+        }
+    }
+    
+    /// <summary>
+    /// EXPENSE_UPDATEが表示されているかチェック
+    /// </summary>
+    private bool IsExpenseUpdateVisible(string messageId)
+    {
+        return visibleExpenseUpdates.Contains(messageId);
     }
 
     private async Task ScrollToBottom()
@@ -848,7 +983,7 @@ private string? lastKnownAgentId = null;
         {
             // Reset message and update temp ID with current value
             agentSettingsMessage = string.Empty;
-            tempAgentId = AzureAIAgentService.GetCurrentAgentId() ?? string.Empty;
+            tempAgentName = AzureAIAgentService.GetCurrentAgentName() ?? string.Empty;
         }
     }
 
@@ -856,22 +991,22 @@ private string? lastKnownAgentId = null;
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(tempAgentId))
+            if (string.IsNullOrWhiteSpace(tempAgentName))
             {
-                agentSettingsMessage = "Agent ID cannot be empty";
+                agentSettingsMessage = "Agent Name cannot be empty";
                 agentSettingsSuccess = false;
                 return;
             }
 
-            // Update the agent ID
-            AzureAIAgentService.SetAgentId(tempAgentId.Trim());
+            // Update the Agent Name
+            AzureAIAgentService.SetAgentName(tempAgentName.Trim());
             
             // Clear current thread to start fresh with new agent
             currentThreadId = null;
             AgentModeService.CurrentThreadId = null;
             chatHistory.Clear();
             
-            agentSettingsMessage = "Agent ID updated successfully";
+            agentSettingsMessage = "Agent Name updated successfully";
             agentSettingsSuccess = true;
             
             // Hide settings after successful update
@@ -883,7 +1018,7 @@ private string? lastKnownAgentId = null;
         }
         catch (Exception ex)
         {
-            agentSettingsMessage = $"Error updating Agent ID: {ex.Message}";
+            agentSettingsMessage = $"Error updating Agent Name: {ex.Message}";
             agentSettingsSuccess = false;
         }
     }
@@ -892,7 +1027,7 @@ private string? lastKnownAgentId = null;
     {
         showAgentSettings = false;
         agentSettingsMessage = string.Empty;
-        tempAgentId = AzureAIAgentService.GetCurrentAgentId() ?? string.Empty;
+        tempAgentName = AzureAIAgentService.GetCurrentAgentName() ?? string.Empty;
     }
     
     /// <summary>
@@ -1040,35 +1175,46 @@ private string? lastKnownAgentId = null;
     /// Parse AI response for UI update instructions
     /// Supports both product updates and travel expense form updates
     /// Example format: "EXPENSE_UPDATE: applicant=田中太郎, destination=大阪, transportCost=15000"
+    /// 
+    /// 複数のEXPENSE_UPDATE行があっても、すべて処理します（逐次的な情報反映）
     /// </summary>
     private void ParseAndExecuteUIInstructions(string aiResponse)
     {
         try
         {
             var lines = aiResponse.Split('\n');
+            int updateCount = 0;
             foreach (var line in lines)
             {
                 // 旅費申請フォームの更新をチェック
                 if (line.Trim().StartsWith("EXPENSE_UPDATE:", StringComparison.OrdinalIgnoreCase))
                 {
+                    updateCount++;
+                    Console.WriteLine($"🔄 Processing EXPENSE_UPDATE #{updateCount}");
                     ParseTravelExpenseUpdate(line);
                 }
+            }
+            
+            if (updateCount > 0)
+            {
+                Console.WriteLine($"✅ Total EXPENSE_UPDATE processed: {updateCount}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error parsing UI instructions: {ex.Message}");
+            Console.WriteLine($"❌ Error parsing UI instructions: {ex.Message}");
         }
     }
     
     /// <summary>
     /// 旅費申請フォームの更新を解析
+    /// 部分的な情報のみが含まれている場合でも処理します（逐次更新対応）
     /// </summary>
     private void ParseTravelExpenseUpdate(string line)
     {
         try
         {
-            Console.WriteLine($"✅ Parsing EXPENSE_UPDATE: {line}");
+            Console.WriteLine($"📝 Parsing EXPENSE_UPDATE: {line}");
             
             var instructionPart = line.Substring(line.IndexOf(':') + 1).Trim();
             var parameters = instructionPart.Split(',')
@@ -1076,19 +1222,18 @@ private string? lastKnownAgentId = null;
                 .Where(p => p.Length == 2)
                 .ToDictionary(p => p[0].Trim().ToLowerInvariant(), p => p[1].Trim());
             
-            Console.WriteLine($"📋 Parsed {parameters.Count} parameters");
+            Console.WriteLine($"📊 Parsed {parameters.Count} parameters:");
             foreach (var kvp in parameters)
             {
-                Console.WriteLine($"   - {kvp.Key} = {kvp.Value}");
+                Console.WriteLine($"   ✓ {kvp.Key} = {kvp.Value}");
             }
             
+            // 部分更新用のインストラクション（nullableな値のみ設定）
             var instruction = new TravelExpenseUIUpdateInstruction();
             
-            // 申請者名：指定がない場合はデフォルト値を設定
-            if (parameters.TryGetValue("applicant", out var applicant))
-                instruction.ApplicantName = applicant;
-            else
-                instruction.ApplicantName = "田中 太郎"; // テスト用デフォルト値
+            // 申請者名は指定しない（Entra IDから自動取得されるため）
+            // if (parameters.TryGetValue("applicant", out var applicant))
+            //     instruction.ApplicantName = applicant;
                 
             if (parameters.TryGetValue("destination", out var destination))
                 instruction.Destination = destination;

@@ -1,7 +1,9 @@
 using Azure;
 using Azure.AI.Projects;
+using Azure.AI.Projects.OpenAI;
 using Azure.Identity;
-using Azure.AI.Agents.Persistent;
+using OpenAI;
+using OpenAI.Responses;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,21 +17,24 @@ using Microsoft.Extensions.Logging;
 namespace TravelExpenseWebApp.Services
 {
     /// <summary>
-    /// Azure AI Projects 1.1.0 �����h�L�������g������
-    /// GetPersistentAgentsClient() �g�p
+    /// Azure AI Projects 1.2.* 以降の新しいAPI（OpenAI Response Client）を使用
     /// </summary>
     public class AzureAIAgentService
     {
         private readonly IConfiguration _configuration;
         private readonly ILogger<AzureAIAgentService> _logger;
         private AIProjectClient? _projectClient;
-        private PersistentAgentsClient? _agentsClient;
-        private string? _agentId;
-        private readonly string? _originalAgentId;
+        private OpenAIResponseClient? _responseClient;
+        private AgentVersion? _agentVersion;
+        private string? _agentName;
+        private string? _modelDeploymentName;
+        private readonly string? _originalAgentName;
         private string? _projectEndpoint;
         private bool _isConfigured = false;
         private bool _isInitialized = false;
-        private readonly object _initLock = new object();
+        private bool _initializationFailed = false;
+        private string? _initializationError = null;
+        private readonly SemaphoreSlim _initLock = new SemaphoreSlim(1, 1);
         private readonly int _maxCacheEntries = 100;
         
         private readonly ConcurrentDictionary<string, List<ChatMessage>> _threadHistoryCache = new();
@@ -43,344 +48,309 @@ namespace TravelExpenseWebApp.Services
             _projectEndpoint = configuration["AzureAIAgent:ProjectEndpoint"]
                 ?? Environment.GetEnvironmentVariable("AzureAIAgent__ProjectEndpoint");
 
-            _agentId = configuration["AzureAIAgent:AgentId"]
-                ?? Environment.GetEnvironmentVariable("AzureAIAgent__AgentId");
+            _agentName = configuration["AzureAIAgent:AgentName"]
+                ?? Environment.GetEnvironmentVariable("AzureAIAgent__AgentName");
 
-            _originalAgentId = _agentId;
+            _modelDeploymentName = configuration["AzureAIAgent:ModelDeploymentName"]
+                ?? Environment.GetEnvironmentVariable("AzureAIAgent__ModelDeploymentName");
 
-            _isConfigured = !string.IsNullOrEmpty(_projectEndpoint) && !string.IsNullOrEmpty(_agentId);
+            _originalAgentName = _agentName;
+
+            _isConfigured = !string.IsNullOrEmpty(_projectEndpoint) 
+                && !string.IsNullOrEmpty(_agentName) 
+                && !string.IsNullOrEmpty(_modelDeploymentName);
 
             if (!_isConfigured)
             {
-                _logger.LogWarning("Azure AI Agent configuration missing");
+                _logger.LogWarning("Azure AI Agent configuration missing. Required: ProjectEndpoint, AgentName, ModelDeploymentName");
             }
             else
             {
-                _logger.LogInformation("Azure AI Agent (Projects 1.1.0) initialized");
-                EnsureInitialized();
+                _logger.LogInformation("Azure AI Agent (Projects 1.2.*) configured");
+                // バックグラウンドで初期化を開始（ブロックしない）
+                _ = Task.Run(async () => await EnsureInitializedAsync());
             }
         }
 
-        private void EnsureInitialized()
+        private async Task EnsureInitializedAsync()
         {
-            if (_isInitialized || !_isConfigured)
+            if (_isInitialized || !_isConfigured || _initializationFailed)
                 return;
 
-            lock (_initLock)
+            await _initLock.WaitAsync();
+            try
             {
-                if (_isInitialized)
+                if (_isInitialized || _initializationFailed)
                     return;
 
-                try
+                _logger.LogInformation("Initializing Azure AI Projects client...");
+                _logger.LogInformation("Project Endpoint: {Endpoint}", _projectEndpoint);
+                _logger.LogInformation("Agent Name: {AgentName}", _agentName);
+                _logger.LogInformation("Model Deployment: {ModelDeploymentName}", _modelDeploymentName);
+                
+                var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
                 {
-                    _logger.LogInformation("Initializing Azure AI Projects client...");
-                    _logger.LogInformation("Project Endpoint: {Endpoint}", _projectEndpoint);
-                    _logger.LogInformation("Agent ID: {AgentId}", _agentId);
-                    
-                    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
-                    {
-                        ExcludeEnvironmentCredential = false,
-                        ExcludeManagedIdentityCredential = false,
-                        ExcludeSharedTokenCacheCredential = false,
-                        ExcludeVisualStudioCredential = false,
-                        ExcludeVisualStudioCodeCredential = false,
-                        ExcludeAzureCliCredential = false,
-                        ExcludeAzurePowerShellCredential = false,
-                        ExcludeInteractiveBrowserCredential = true // Disable browser pop-up in production
-                    });
-                    
-                    _projectClient = new AIProjectClient(new Uri(_projectEndpoint!), credential);
-                    _agentsClient = _projectClient.GetPersistentAgentsClient();
-                    _isInitialized = true;
-                    _logger.LogInformation("✅ Azure AI Projects client initialized successfully (GetPersistentAgentsClient)");
-                }
-                catch (Azure.Identity.AuthenticationFailedException authEx)
+                    ExcludeEnvironmentCredential = false,
+                    ExcludeManagedIdentityCredential = false,
+                    ExcludeSharedTokenCacheCredential = false,
+                    ExcludeVisualStudioCredential = false,
+                    ExcludeVisualStudioCodeCredential = false,
+                    ExcludeAzureCliCredential = false,
+                    ExcludeAzurePowerShellCredential = false,
+                    ExcludeInteractiveBrowserCredential = true // Disable browser pop-up in production
+                });
+                
+                // Initialize AIProjectClient
+                _projectClient = new AIProjectClient(endpoint: new Uri(_projectEndpoint!), tokenProvider: credential);
+
+                // Read AI_AGENT_INSTRUCTIONS.md file
+                string instructions = await ReadAgentInstructionsAsync();
+
+                // Create agent with instructions from file
+                PromptAgentDefinition agentDefinition = new(model: _modelDeploymentName!)
                 {
-                    _logger.LogError(authEx, "❌ Authentication failed. Please ensure proper Azure credentials are configured.");
-                    _logger.LogError("Authentication error details: {Message}", authEx.Message);
-                    _logger.LogError("Please check: 1) Azure CLI login (az login), 2) Visual Studio account, 3) Managed Identity permissions");
-                }
-                catch (Exception ex)
+                    Instructions = instructions
+                };
+
+                // Create or update agent version
+                _agentVersion = _projectClient.Agents.CreateAgentVersion(
+                    agentName: _agentName!,
+                    options: new(agentDefinition));
+
+                _logger.LogInformation("✅ Agent created/updated (id: {AgentId}, name: {AgentName}, version: {Version})",
+                    _agentVersion.Id, _agentVersion.Name, _agentVersion.Version);
+
+                // Get OpenAI Response Client for the agent
+                _responseClient = _projectClient.OpenAI.GetProjectResponsesClientForAgent(_agentVersion);
+                
+                _isInitialized = true;
+                _logger.LogInformation("✅ Azure AI Projects client initialized successfully (OpenAI Response Client)");
+            }
+            catch (Azure.Identity.AuthenticationFailedException authEx)
+            {
+                _initializationFailed = true;
+                _initializationError = $"認証エラー: {authEx.Message}";
+                _logger.LogError(authEx, "❌ Authentication failed. Please ensure proper Azure credentials are configured.");
+                _logger.LogError("Authentication error details: {Message}", authEx.Message);
+                _logger.LogError("Please check: 1) Azure CLI login (az login), 2) Visual Studio account, 3) Managed Identity permissions");
+            }
+            catch (Exception ex)
+            {
+                _initializationFailed = true;
+                _initializationError = $"初期化エラー: {ex.Message}";
+                _logger.LogError(ex, "❌ Error initializing Azure AI Projects client");
+                _logger.LogError("Error type: {Type}", ex.GetType().Name);
+                _logger.LogError("Error message: {Message}", ex.Message);
+                if (ex.InnerException != null)
                 {
-                    _logger.LogError(ex, "❌ Error initializing Azure AI Projects client");
-                    _logger.LogError("Error type: {Type}", ex.GetType().Name);
-                    _logger.LogError("Error message: {Message}", ex.Message);
-                    if (ex.InnerException != null)
-                    {
-                        _logger.LogError("Inner exception: {InnerMessage}", ex.InnerException.Message);
-                    }
+                    _logger.LogError("Inner exception: {InnerMessage}", ex.InnerException.Message);
                 }
+            }
+            finally
+            {
+                _initLock.Release();
+            }
+        }
+
+        private async Task<string> ReadAgentInstructionsAsync()
+        {
+            try
+            {
+                string instructionsPath = Path.Combine(AppContext.BaseDirectory, "AI_AGENT_INSTRUCTIONS.md");
+                if (File.Exists(instructionsPath))
+                {
+                    _logger.LogInformation("Loading agent instructions from: {Path}", instructionsPath);
+                    return await File.ReadAllTextAsync(instructionsPath);
+                }
+                else
+                {
+                    _logger.LogWarning("AI_AGENT_INSTRUCTIONS.md not found at: {Path}, using default instructions", instructionsPath);
+                    return "You are a travel expense assistant. Extract travel information from natural language and output it in EXPENSE_UPDATE format.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading AI_AGENT_INSTRUCTIONS.md");
+                return "You are a travel expense assistant.";
             }
         }
 
         public async Task<string> CreateThreadAsync()
         {
-            if (!_isConfigured || _agentsClient == null)
+            // 新しいAPIではスレッドが不要なため、ダミーIDを返す
+            // セッションごとにユニークなIDを生成
+            await EnsureInitializedAsync();
+            
+            if (_initializationFailed)
             {
-                _logger.LogWarning("Attempted to create thread with unconfigured service");
+                _logger.LogError("Cannot create session: Initialization failed - {Error}", _initializationError);
+                return $"initialization-failed: {_initializationError}";
+            }
+
+            if (!_isConfigured)
+            {
+                _logger.LogWarning("Agent not configured");
                 return "agent-not-configured";
             }
 
-            EnsureInitialized();
-
-            try
-            {
-                var thread = _agentsClient.Threads.CreateThread();
-                var threadId = thread.Value.Id;
-                _logger.LogInformation("? Thread created: {ThreadId}", threadId);
-                return threadId;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating thread");
-                return "thread-creation-failed";
-            }
+            var sessionId = $"session-{Guid.NewGuid()}";
+            _logger.LogInformation("✅ Session created: {SessionId}", sessionId);
+            return sessionId;
         }
 
-        public async Task<string> SendMessageWithImageAsync(string threadId, string userMessage, Stream imageStream, string imageFileName)
+        public async Task<string> SendMessageWithImageAsync(string sessionId, string userMessage, Stream imageStream, string imageFileName)
         {
-            if (!_isConfigured || threadId == "agent-not-configured")
-                return "�G�[�W�F���g���������ݒ肳��Ă��܂���B";
+            if (!_isConfigured || sessionId == "agent-not-configured" || sessionId.StartsWith("initialization-failed"))
+                return "エージェントが正しく設定されていません。";
 
-            EnsureInitialized();
+            await EnsureInitializedAsync();
+            
+            if (_initializationFailed)
+                return $"クライアントの初期化に失敗しました: {_initializationError}";
 
-            if (_agentsClient == null || _agentId == null)
-                return "�N���C�A���g�̏������Ɏ��s���܂����B";
+            if (_responseClient == null)
+                return "クライアントの初期化に失敗しました。";
 
             var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             try
             {
-                // 1. Upload file with purpose=Agents (Vision enum��beta SDK�Ŗ��T�|�[�g)
-                _logger.LogInformation("?? Uploading image: {FileName}", imageFileName);
-                var uploadedFile = await _agentsClient.Files.UploadFileAsync(
-                    imageStream,
-                    PersistentAgentFilePurpose.Agents,  // ? Agents purpose for multimodal
-                    imageFileName);
+                _logger.LogInformation("📤 Uploading image: {FileName}", imageFileName);
 
-                var fileId = uploadedFile.Value.Id;
-                _logger.LogInformation("? Image uploaded (purpose=Agents): {FileId}", fileId);
-
-                // 2. Create message with multimodal content (text + image)
+                // Note: Image upload functionality may need to be adapted based on the new API's capabilities
+                // For now, we'll use text-only processing
                 var messageText = !string.IsNullOrWhiteSpace(userMessage) 
-                    ? userMessage
-                    : "���̉摜�𕪐͂��āA�o�����i���t�A�ꏊ�A���z�A�ړI�Ȃǁj�𒊏o���Ă��������B";
+                    ? $"{userMessage}\n[画像がアップロードされました: {imageFileName}]"
+                    : $"この画像を分析して、出張情報（日付、場所、金額、目的など）を抽出してください。\n[画像: {imageFileName}]";
 
-                // ? SDK 1.2.0-beta.7: Use MessageInputContentBlock for multimodal
-                var contentBlocks = new List<MessageInputContentBlock>
+                _logger.LogWarning("⚠️ Image analysis with new API - using text fallback. Full multimodal support may require additional implementation.");
+
+                // Use OpenAI Response Client
+                OpenAIResponse response = _responseClient.CreateResponse(messageText);
+
+                string responseText = response.GetOutputText();
+
+                _logger.LogInformation("✅ TOTAL TIME (with image): {TotalDuration}ms", totalStopwatch.ElapsedMilliseconds);
+
+                // Cache the message for history
+                AddMessageToCache(sessionId, new ChatMessage
                 {
-                    new MessageInputTextBlock(messageText),
-                    new MessageInputImageFileBlock(new MessageImageFileParam(fileId))
-                };
+                    Content = messageText,
+                    IsUser = true,
+                    Timestamp = DateTime.Now
+                });
 
-                var message = await _agentsClient.Messages.CreateMessageAsync(
-                    threadId,
-                    MessageRole.User,
-                    contentBlocks);
-
-                _logger.LogInformation("? Message created with image: {MessageId}, FileId: {FileId}", message.Value.Id, fileId);
-
-                // 3. Run agent
-                var run = _agentsClient.Runs.CreateRun(threadId, _agentId);
-
-                // 4. Poll for completion
-                int pollCount = 0;
-                do
+                AddMessageToCache(sessionId, new ChatMessage
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(pollCount < 5 ? 100 : 300));
-                    run = _agentsClient.Runs.GetRun(threadId, run.Value.Id);
-                    pollCount++;
-                }
-                while (run.Value.Status == RunStatus.Queued || run.Value.Status == RunStatus.InProgress);
+                    Content = responseText,
+                    FormattedContent = FormatMessageContent(responseText),
+                    IsUser = false,
+                    Timestamp = DateTime.Now
+                });
 
-                _logger.LogInformation("?? Polling ({PollCount} polls): {Status}", pollCount, run.Value.Status);
-
-                if (run.Value.Status != RunStatus.Completed)
-                {
-                    _logger.LogWarning("Run failed: {Error}", run.Value.LastError?.Message);
-                    return $"�G�[�W�F���g�̎��s�Ɏ��s���܂���: {run.Value.LastError?.Message}";
-                }
-
-                // 5. Get messages
-                var messages = _agentsClient.Messages.GetMessages(threadId, order: ListSortOrder.Ascending);
-                var latestAssistantMessage = messages
-                    .Where(m => m.Role.ToString().Equals("Assistant", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(m => m.CreatedAt)
-                    .FirstOrDefault();
-
-                if (latestAssistantMessage != null)
-                {
-                    string responseText = "";
-                    foreach (var contentItem in latestAssistantMessage.ContentItems)
-                    {
-                        if (contentItem is MessageTextContent textContent)
-                        {
-                            responseText += textContent.Text;
-                        }
-                    }
-
-                    _logger.LogInformation("? TOTAL TIME (with image): {TotalDuration}ms", totalStopwatch.ElapsedMilliseconds);
-                    return responseText;
-                }
-
-                return "����������܂���ł����B";
+                return responseText;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending message with image");
-                return $"�G���[���������܂���: {ex.Message}";
+                return $"エラーが発生しました: {ex.Message}";
             }
         }
 
-        public async Task<string> SendMessageAsync(string threadId, string userMessage)
+        public async Task<string> SendMessageAsync(string sessionId, string userMessage)
         {
-            if (!_isConfigured || threadId == "agent-not-configured")
-                return "�G�[�W�F���g���������ݒ肳��Ă��܂���B";
+            if (!_isConfigured || sessionId == "agent-not-configured" || sessionId.StartsWith("initialization-failed"))
+                return "エージェントが正しく設定されていません。";
 
-            EnsureInitialized();
+            await EnsureInitializedAsync();
+            
+            if (_initializationFailed)
+                return $"クライアントの初期化に失敗しました: {_initializationError}";
 
-            if (_agentsClient == null || _agentId == null)
-                return "�N���C�A���g�̏������Ɏ��s���܂����B";
+            if (_responseClient == null)
+                return "クライアントの初期化に失敗しました。";
 
             var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             try
             {
-                // 1. Create message
-                var message = _agentsClient.Messages.CreateMessage(
-                    threadId,
-                    MessageRole.User,
-                    userMessage);
+                _logger.LogInformation("Sending message to agent...");
 
-                // 2. Run agent
-                var run = _agentsClient.Runs.CreateRun(threadId, _agentId);
+                // Use OpenAI Response Client to generate response
+                OpenAIResponse response = _responseClient.CreateResponse(userMessage);
 
-                // 3. Poll for completion
-                int pollCount = 0;
-                do
+                string responseText = response.GetOutputText();
+
+                _logger.LogInformation("✅ TOTAL TIME: {TotalDuration}ms", totalStopwatch.ElapsedMilliseconds);
+                
+                // Cache the message for history
+                AddMessageToCache(sessionId, new ChatMessage
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(pollCount < 5 ? 100 : 300));
-                    run = _agentsClient.Runs.GetRun(threadId, run.Value.Id);
-                    pollCount++;
-                }
-                while (run.Value.Status == RunStatus.Queued || run.Value.Status == RunStatus.InProgress);
+                    Content = userMessage,
+                    IsUser = true,
+                    Timestamp = DateTime.Now
+                });
 
-                _logger.LogInformation("?? Polling ({PollCount} polls)", pollCount);
-
-                if (run.Value.Status != RunStatus.Completed)
+                AddMessageToCache(sessionId, new ChatMessage
                 {
-                    _logger.LogWarning("Run failed: {Error}", run.Value.LastError?.Message);
-                    return $"�G�[�W�F���g�̎��s�Ɏ��s���܂���: {run.Value.LastError?.Message}";
-                }
+                    Content = responseText,
+                    FormattedContent = FormatMessageContent(responseText),
+                    IsUser = false,
+                    Timestamp = DateTime.Now
+                });
 
-                // 4. Get messages
-                var messages = _agentsClient.Messages.GetMessages(threadId, order: ListSortOrder.Ascending);
-                var latestAssistantMessage = messages
-                    .Where(m => m.Role.ToString().Equals("Assistant", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(m => m.CreatedAt)
-                    .FirstOrDefault();
-
-                if (latestAssistantMessage != null)
-                {
-                    string responseText = "";
-                    foreach (var contentItem in latestAssistantMessage.ContentItems)
-                    {
-                        if (contentItem is MessageTextContent textContent)
-                        {
-                            responseText += textContent.Text;
-                        }
-                    }
-
-                    _logger.LogInformation("? TOTAL TIME: {TotalDuration}ms", totalStopwatch.ElapsedMilliseconds);
-                    return responseText;
-                }
-
-                return "����������܂���ł����B";
+                return responseText;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending message");
-                return $"�G���[���������܂���: {ex.Message}";
+                return $"エラーが発生しました: {ex.Message}";
             }
         }
 
-        public async Task<List<ChatMessage>> GetThreadHistoryAsync(string threadId)
+        private void AddMessageToCache(string sessionId, ChatMessage message)
         {
-            if (!_isConfigured || threadId == "agent-not-configured" || _agentsClient == null)
+            if (!_threadHistoryCache.ContainsKey(sessionId))
+            {
+                _threadHistoryCache[sessionId] = new List<ChatMessage>();
+            }
+
+            _threadHistoryCache[sessionId].Add(message);
+            _lastCacheUpdateTime[sessionId] = DateTime.UtcNow;
+
+            // Limit cache size
+            if (_threadHistoryCache.Count > _maxCacheEntries)
+            {
+                var oldestEntry = _lastCacheUpdateTime.OrderBy(x => x.Value).First();
+                _threadHistoryCache.TryRemove(oldestEntry.Key, out _);
+                _lastCacheUpdateTime.TryRemove(oldestEntry.Key, out _);
+            }
+        }
+
+        public async Task<List<ChatMessage>> GetThreadHistoryAsync(string sessionId)
+        {
+            await Task.CompletedTask; // For async signature compatibility
+
+            if (!_isConfigured || sessionId == "agent-not-configured")
             {
                 return new List<ChatMessage>
                 {
                     new ChatMessage
                     {
-                        Content = "�G�[�W�F���g���������ݒ肳��Ă��܂���B",
+                        Content = "エージェントが正しく設定されていません。",
                         IsUser = false,
                         Timestamp = DateTime.Now
                     }
                 };
             }
 
-            if (_threadHistoryCache.TryGetValue(threadId, out var cachedHistory) &&
-                _lastCacheUpdateTime.TryGetValue(threadId, out var lastUpdate) &&
-                (DateTime.UtcNow - lastUpdate).TotalSeconds < 5)
+            // Return cached history for this session
+            if (_threadHistoryCache.TryGetValue(sessionId, out var cachedHistory))
             {
                 return new List<ChatMessage>(cachedHistory);
             }
 
-            var chatHistory = new List<ChatMessage>();
-
-            try
-            {
-                var messages = _agentsClient.Messages.GetMessages(threadId);
-
-                foreach (var message in messages.OrderBy(m => m.CreatedAt))
-                {
-                    string messageContent = "";
-                    foreach (var contentItem in message.ContentItems)
-                    {
-                        if (contentItem is MessageTextContent textContent)
-                        {
-                            messageContent += textContent.Text ?? string.Empty;
-                        }
-                    }
-
-                    string formattedContent = !message.Role.ToString().Equals("User", StringComparison.OrdinalIgnoreCase) ?
-                        FormatMessageContent(messageContent) : "";
-
-                    chatHistory.Add(new ChatMessage
-                    {
-                        Content = messageContent,
-                        FormattedContent = formattedContent,
-                        IsUser = message.Role.ToString().Equals("User", StringComparison.OrdinalIgnoreCase),
-                        Timestamp = message.CreatedAt.DateTime
-                    });
-                }
-
-                if (_threadHistoryCache.Count >= _maxCacheEntries)
-                {
-                    var oldestEntries = _lastCacheUpdateTime
-                        .OrderBy(x => x.Value)
-                        .Take(_threadHistoryCache.Count - _maxCacheEntries + 1)
-                        .ToList();
-
-                    foreach (var entry in oldestEntries)
-                    {
-                        _threadHistoryCache.TryRemove(entry.Key, out _);
-                        _lastCacheUpdateTime.TryRemove(entry.Key, out _);
-                    }
-                }
-
-                _threadHistoryCache.AddOrUpdate(threadId, new List<ChatMessage>(chatHistory),
-                    (key, oldValue) => new List<ChatMessage>(chatHistory));
-                _lastCacheUpdateTime.AddOrUpdate(threadId, DateTime.UtcNow,
-                    (key, oldValue) => DateTime.UtcNow);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving thread history");
-                return cachedHistory ?? new List<ChatMessage>();
-            }
-
-            return chatHistory;
+            return new List<ChatMessage>();
         }
 
         private string FormatMessageContent(string content)
@@ -399,29 +369,33 @@ namespace TravelExpenseWebApp.Services
                 .Replace("?", "<br>?");
         }
 
-        public void SetAgentId(string newAgentId)
+        public void SetAgentName(string newAgentName)
         {
-            if (string.IsNullOrWhiteSpace(newAgentId))
+            if (string.IsNullOrWhiteSpace(newAgentName))
             {
-                _logger.LogWarning("Attempted to set empty Agent ID");
+                _logger.LogWarning("Attempted to set empty Agent Name");
                 return;
             }
 
-            _agentId = newAgentId;
-            _isConfigured = !string.IsNullOrEmpty(_projectEndpoint) && !string.IsNullOrEmpty(_agentId);
+            _agentName = newAgentName;
+            _isConfigured = !string.IsNullOrEmpty(_projectEndpoint) 
+                && !string.IsNullOrEmpty(_agentName) 
+                && !string.IsNullOrEmpty(_modelDeploymentName);
             _isInitialized = false;
+            _initializationFailed = false;
+            _initializationError = null;
 
-            _logger.LogInformation("Agent ID updated");
+            _logger.LogInformation("Agent Name updated to: {AgentName}", _agentName);
         }
 
-        public string? GetCurrentAgentId() => _agentId;
-        public string? GetOriginalAgentId() => _originalAgentId;
-        public bool IsAgentIdModified() => _agentId != _originalAgentId;
+        public string? GetCurrentAgentName() => _agentName;
+        public string? GetOriginalAgentName() => _originalAgentName;
+        public bool IsAgentNameModified() => _agentName != _originalAgentName;
         public bool IsConfigured() => _isConfigured;
 
-        public async IAsyncEnumerable<string> SendMessageStreamAsync(string threadId, string userMessage)
+        public async IAsyncEnumerable<string> SendMessageStreamAsync(string sessionId, string userMessage)
         {
-            var result = await SendMessageAsync(threadId, userMessage);
+            var result = await SendMessageAsync(sessionId, userMessage);
             yield return result;
         }
     }
