@@ -45,6 +45,8 @@ namespace TravelExpenseWebApp.Services
             _configuration = configuration;
             _logger = logger;
 
+            _logger.LogInformation("🔍 AzureAIAgentService constructor started");
+
             _projectEndpoint = configuration["AzureAIAgent:ProjectEndpoint"]
                 ?? Environment.GetEnvironmentVariable("AzureAIAgent__ProjectEndpoint");
 
@@ -54,11 +56,18 @@ namespace TravelExpenseWebApp.Services
             _modelDeploymentName = configuration["AzureAIAgent:ModelDeploymentName"]
                 ?? Environment.GetEnvironmentVariable("AzureAIAgent__ModelDeploymentName");
 
+            _logger.LogInformation("🔍 Configuration values loaded:");
+            _logger.LogInformation("  - ProjectEndpoint: {Endpoint}", _projectEndpoint ?? "(null)");
+            _logger.LogInformation("  - AgentName: {AgentName}", _agentName ?? "(null)");
+            _logger.LogInformation("  - ModelDeploymentName: {ModelDeploymentName}", _modelDeploymentName ?? "(null)");
+
             _originalAgentName = _agentName;
 
             _isConfigured = !string.IsNullOrEmpty(_projectEndpoint) 
                 && !string.IsNullOrEmpty(_agentName) 
                 && !string.IsNullOrEmpty(_modelDeploymentName);
+
+            _logger.LogInformation("🔍 IsConfigured: {IsConfigured}", _isConfigured);
 
             if (!_isConfigured)
             {
@@ -392,6 +401,27 @@ namespace TravelExpenseWebApp.Services
         public string? GetOriginalAgentName() => _originalAgentName;
         public bool IsAgentNameModified() => _agentName != _originalAgentName;
         public bool IsConfigured() => _isConfigured;
+        public bool IsInitializationFailed() => _initializationFailed;
+        public string? GetInitializationError() => _initializationError;
+        public string GetConfigurationStatus()
+        {
+            if (!_isConfigured)
+            {
+                return $"設定不足:\n" +
+                       $"- ProjectEndpoint: {(_projectEndpoint != null ? "✅" : "❌")}\n" +
+                       $"- AgentName: {(_agentName != null ? "✅" : "❌")}\n" +
+                       $"- ModelDeploymentName: {(_modelDeploymentName != null ? "✅" : "❌")}";
+            }
+            if (_initializationFailed)
+            {
+                return $"初期化失敗:\n{_initializationError}";
+            }
+            if (!_isInitialized)
+            {
+                return "初期化中...";
+            }
+            return "✅ 正常に初期化済み";
+        }
 
         public async IAsyncEnumerable<string> SendMessageStreamAsync(string sessionId, string userMessage)
         {

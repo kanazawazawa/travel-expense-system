@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);OPENAI001</NoWarn>
+    <Version>1.0.0</Version>
+    <InformationalVersion>Build: $([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss')) UTC</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
