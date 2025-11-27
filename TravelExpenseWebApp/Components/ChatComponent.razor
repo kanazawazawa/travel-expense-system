@@ -194,34 +194,21 @@
                @bind:event="oninput" 
                @onkeypress="HandleKeyPress" 
                disabled="@(!isAgentReady)" />
-        <button class="chat-send-btn" @onclick="SendChatMessage" disabled="@(!isAgentReady || isLoading || (string.IsNullOrWhiteSpace(chatMessage) && selectedFile == null && clipboardImageData == null))">
+        <button class="chat-send-btn" @onclick="SendChatMessage" disabled="@(!isAgentReady || isLoading || (string.IsNullOrWhiteSpace(chatMessage) && selectedFile == null))">
             <i class="bi bi-send-fill"></i>
         </button>
     </div>
     
-    @if (selectedFile != null || clipboardImageData != null)
+    @if (selectedFile != null)
     {
         <div class="file-preview">
             <div class="file-info">
-                @if (selectedFile != null)
-                {
-                    <i class="bi @GetFileIcon(selectedFile.Name)"></i>
-                    <span class="file-name">@selectedFile.Name</span>
-                    <span class="file-size">(@FormatFileSize(selectedFile.Size))</span>
-                    <button class="btn-remove-file" @onclick="RemoveSelectedFile" title="削除">
-                        <i class="bi bi-x-circle"></i>
-                    </button>
-                }
-                else if (clipboardImageData != null && clipboardImageFileName != null)
-                {
-                    <i class="bi bi-file-image-fill text-primary"></i>
-                    <span class="file-name">@clipboardImageFileName</span>
-                    <span class="file-size">(@FormatFileSize(clipboardImageData.Length))</span>
-                    <span class="badge bg-info ms-2">📋 ペースト</span>
-                    <button class="btn-remove-file" @onclick="RemoveClipboardImage" title="削除">
-                        <i class="bi bi-x-circle"></i>
-                    </button>
-                }
+                <i class="bi @GetFileIcon(selectedFile.Name)"></i>
+                <span class="file-name">@selectedFile.Name</span>
+                <span class="file-size">(@FormatFileSize(selectedFile.Size))</span>
+                <button class="btn-remove-file" @onclick="RemoveSelectedFile" title="削除">
+                    <i class="bi bi-x-circle"></i>
+                </button>
             </div>
         </div>
     }
@@ -551,10 +538,6 @@ private HashSet<string> visibleExpenseUpdates = new();
     private IBrowserFile? selectedFile;
     private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
     
-    // Clipboard image data
-    private byte[]? clipboardImageData;
-    private string? clipboardImageFileName;
-    
     // Agent readiness tracking
     private bool isAgentReady = false;
     private int initializationCountdown = 5; // seconds
@@ -650,15 +633,8 @@ private HashSet<string> visibleExpenseUpdates = new();
             await LoadChatHistoryAsync();
         }
         
-        // クリップボードからの画像ペーストを有効化（毎回実行して再接続後も確実に動作させる）
-        try
-        {
-            await EnableClipboardPaste();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"⚠️ Failed to enable clipboard paste: {ex.Message}");
-        }
+        // Simple clipboard paste handler
+        await SetupSimpleClipboardPaste();
         
         // Scroll to bottom only when needed
         if (needsScrolling)
@@ -668,24 +644,6 @@ private HashSet<string> visibleExpenseUpdates = new();
         }
     }
     
-    /// <summary>
-    /// クリップボードからの画像ペーストを有効化
-    /// </summary>
-    private async Task EnableClipboardPaste()
-    {
-        var dotnetRef = DotNetObjectReference.Create(this);
-        await JSRuntime.InvokeVoidAsync("setupClipboardPaste", dotnetRef);
-    }
-    
-    /// <summary>
-    /// クリップボードから貼り付けた画像を受け取る
-    /// </summary>
-    [JSInvokable]
-    public void OnImagePasted(string base64Data, string fileName, long fileSize)
-    {
-        ProcessClipboardImage(base64Data, fileName, fileSize);
-    }
-
     private void StartCountdownTimer()
     {
         countdownTimer = new System.Threading.Timer(async _ =>
@@ -733,7 +691,7 @@ private HashSet<string> visibleExpenseUpdates = new();
 
     private async Task SendChatMessage()
     {
-        if (string.IsNullOrWhiteSpace(chatMessage) && selectedFile == null && clipboardImageData == null)
+        if (string.IsNullOrWhiteSpace(chatMessage) && selectedFile == null)
             return;
             
         // メッセージ内容の準備
@@ -741,10 +699,6 @@ private HashSet<string> visibleExpenseUpdates = new();
         if (selectedFile != null)
         {
             displayMessage += $"\n📎 {selectedFile.Name} ({FormatFileSize(selectedFile.Size)})";
-        }
-        else if (clipboardImageData != null && clipboardImageFileName != null)
-        {
-            displayMessage += $"\n📋 {clipboardImageFileName} ({FormatFileSize(clipboardImageData.Length)})";
         }
             
         // Add user message to chat history
@@ -789,18 +743,9 @@ private HashSet<string> visibleExpenseUpdates = new();
                 return;
             }
         }
-        else if (clipboardImageData != null && clipboardImageFileName != null)
-        {
-            // クリップボード画像を使用
-            fileBytes = clipboardImageData;
-            fileName = clipboardImageFileName;
-            contentType = "image/png";
-        }
         
         var fileToSend = selectedFile;
         selectedFile = null; // Clear selected file
-        clipboardImageData = null; // Clear clipboard image
-        clipboardImageFileName = null;
         isLoading = true;
         needsScrolling = true;
         StateHasChanged(); // Force UI update to show typing indicator
@@ -1084,16 +1029,6 @@ private HashSet<string> visibleExpenseUpdates = new();
     }
     
     /// <summary>
-    /// クリップボード画像を削除
-    /// </summary>
-    private void RemoveClipboardImage()
-    {
-        clipboardImageData = null;
-        clipboardImageFileName = null;
-        StateHasChanged();
-    }
-    
-    /// <summary>
     /// ファイルアイコンを取得
     /// </summary>
     private string GetFileIcon(string fileName)
@@ -1132,53 +1067,6 @@ private HashSet<string> visibleExpenseUpdates = new();
         return extension is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp";
     }
     
-    /// <summary>
-    /// クリップボード画像の処理
-    /// </summary>
-    private void ProcessClipboardImage(string base64Data, string fileName, long fileSize)
-    {
-        try
-        {
-            // Base64データからバイト配列に変換
-            var base64Parts = base64Data.Split(',');
-            var imageData = base64Parts.Length > 1 ? base64Parts[1] : base64Parts[0];
-            var bytes = Convert.FromBase64String(imageData);
-            
-            // ファイルサイズチェック
-            if (bytes.Length > MaxFileSize)
-            {
-                chatHistory.Add(new ChatMessage
-                {
-                    Content = $"画像サイズが大きすぎます。10MB以下の画像を使用してください。（貼り付けた画像: {FormatFileSize(bytes.Length)}）",
-                    IsUser = false,
-                    Timestamp = DateTime.Now
-                });
-                StateHasChanged();
-                return;
-            }
-            
-            // 既存のファイル選択をクリア
-            selectedFile = null;
-            
-            // クリップボード画像データを保存
-            clipboardImageData = bytes;
-            clipboardImageFileName = fileName;
-            
-            Console.WriteLine($"✅ Clipboard image ready: {fileName} ({FormatFileSize(bytes.Length)})");
-            
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            chatHistory.Add(new ChatMessage
-            {
-                Content = $"クリップボード画像の処理に失敗しました: {ex.Message}",
-                IsUser = false,
-                Timestamp = DateTime.Now
-            });
-            StateHasChanged();
-        }
-    }
     
     /// <summary>
     /// Parse AI response for UI update instructions
@@ -1347,6 +1235,56 @@ private HashSet<string> visibleExpenseUpdates = new();
         }
         
         return summary.ToString();
+    }
+    
+    /// <summary>
+    /// シンプルなクリップボードペーストハンドラーのセットアップ
+    /// </summary>
+    private async Task SetupSimpleClipboardPaste()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                if (!window.clipboardPasteSetup) {
+                    window.clipboardPasteSetup = true;
+                    
+                    document.addEventListener('paste', function(e) {
+                        var chatInput = document.getElementById('chatInput');
+                        if (document.activeElement !== chatInput) return;
+                        
+                        var items = e.clipboardData?.items;
+                        if (!items) return;
+                        
+                        for (var i = 0; i < items.length; i++) {
+                            if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+                                e.preventDefault();
+                                var file = items[i].getAsFile();
+                                
+                                // Simulate file selection by triggering InputFile component
+                                var input = document.querySelector('input[type=file]');
+                                if (input) {
+                                    // Create a DataTransfer object to hold the file
+                                    var dataTransfer = new DataTransfer();
+                                    dataTransfer.items.add(file);
+                                    input.files = dataTransfer.files;
+                                    
+                                    // Trigger change event
+                                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                                    console.log('📋 Pasted image simulated as file selection');
+                                }
+                                break;
+                            }
+                        }
+                    });
+                    
+                    console.log('✅ Simple clipboard handler ready');
+                }
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ Clipboard setup failed: {ex.Message}");
+        }
     }
     
     public void Dispose()
