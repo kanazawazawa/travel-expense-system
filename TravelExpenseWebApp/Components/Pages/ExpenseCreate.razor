@@ -76,31 +76,10 @@
         <InputTextArea class="@($"form-control {GetFieldClass("Purpose")}")" rows="3" @bind-Value="request.Purpose" />
     </div>
 
-    <div class="row">
-        <div class="col-md-3">
-            <div class="mb-3">
-                <label class="form-label">交通費</label>
-                <InputNumber class="@($"form-control {GetFieldClass("TransportationCost")}")" @bind-Value="request.TransportationCost" />
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="mb-3">
-                <label class="form-label">宿泊費</label>
-                <InputNumber class="@($"form-control {GetFieldClass("AccommodationCost")}")" @bind-Value="request.AccommodationCost" />
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="mb-3">
-                <label class="form-label">食事代</label>
-                <InputNumber class="@($"form-control {GetFieldClass("MealCost")}")" @bind-Value="request.MealCost" />
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="mb-3">
-                <label class="form-label">その他</label>
-                <InputNumber class="@($"form-control {GetFieldClass("OtherCost")}")" @bind-Value="request.OtherCost" />
-            </div>
-        </div>
+    <div class="mb-3">
+        <label class="form-label">費用 (交通費, 宿泊費, 食事代, その他) *</label>
+        <InputText class="@($"form-control {GetFieldClass("Costs")}")" @bind-Value="costsInput" @bind-Value:event="oninput" placeholder="例: 10000, 5000, 3000, 1000" />
+        <div class="form-text">カンマ区切りで入力: 交通費, 宿泊費, 食事代, その他の順で入力してください</div>
     </div>
 
     <div class="mb-3">
@@ -155,6 +134,13 @@ private string? successMessage;
 private HashSet<string> highlightedFields = new();
 private System.Threading.Timer? highlightTimer;
 
+// Comma-separated costs input
+private string costsInput
+{
+    get => FormatCostsToString();
+    set => ParseCostsFromString(value);
+}
+
 private int TotalAmount =>
     request.TransportationCost +
     request.AccommodationCost +
@@ -164,6 +150,30 @@ private int TotalAmount =>
 private string GetFieldClass(string fieldName)
 {
     return highlightedFields.Contains(fieldName) ? "ai-updated" : "";
+}
+
+private string FormatCostsToString()
+{
+    return $"{request.TransportationCost}, {request.AccommodationCost}, {request.MealCost}, {request.OtherCost}";
+}
+
+private void ParseCostsFromString(string value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        request.TransportationCost = 0;
+        request.AccommodationCost = 0;
+        request.MealCost = 0;
+        request.OtherCost = 0;
+        return;
+    }
+
+    var parts = value.Split(',').Select(p => p.Trim()).ToArray();
+    
+    request.TransportationCost = parts.Length > 0 && int.TryParse(parts[0], out var transport) ? transport : 0;
+    request.AccommodationCost = parts.Length > 1 && int.TryParse(parts[1], out var accom) ? accom : 0;
+    request.MealCost = parts.Length > 2 && int.TryParse(parts[2], out var meal) ? meal : 0;
+    request.OtherCost = parts.Length > 3 && int.TryParse(parts[3], out var other) ? other : 0;
 }
 
 protected override async Task OnInitializedAsync()
@@ -242,7 +252,7 @@ private void HandleTravelExpenseUIUpdate(TravelExpenseUIUpdateInstruction instru
     if (instruction.TransportationCost.HasValue)
     {
         request.TransportationCost = (int)instruction.TransportationCost.Value;
-        highlightedFields.Add("TransportationCost");
+        highlightedFields.Add("Costs");
         updatedFieldsCount++;
         Console.WriteLine($"   ✅ 交通費: {instruction.TransportationCost.Value:N0}円");
     }
@@ -250,7 +260,7 @@ private void HandleTravelExpenseUIUpdate(TravelExpenseUIUpdateInstruction instru
     if (instruction.AccommodationCost.HasValue)
     {
         request.AccommodationCost = (int)instruction.AccommodationCost.Value;
-        highlightedFields.Add("AccommodationCost");
+        highlightedFields.Add("Costs");
         updatedFieldsCount++;
         Console.WriteLine($"   ✅ 宿泊費: {instruction.AccommodationCost.Value:N0}円");
     }
@@ -258,7 +268,7 @@ private void HandleTravelExpenseUIUpdate(TravelExpenseUIUpdateInstruction instru
     if (instruction.MealCost.HasValue)
     {
         request.MealCost = (int)instruction.MealCost.Value;
-        highlightedFields.Add("MealCost");
+        highlightedFields.Add("Costs");
         updatedFieldsCount++;
         Console.WriteLine($"   ✅ 食事代: {instruction.MealCost.Value:N0}円");
     }
@@ -266,7 +276,7 @@ private void HandleTravelExpenseUIUpdate(TravelExpenseUIUpdateInstruction instru
     if (instruction.OtherCost.HasValue)
     {
         request.OtherCost = (int)instruction.OtherCost.Value;
-        highlightedFields.Add("OtherCost");
+        highlightedFields.Add("Costs");
         updatedFieldsCount++;
         Console.WriteLine($"   ✅ その他: {instruction.OtherCost.Value:N0}円");
     }

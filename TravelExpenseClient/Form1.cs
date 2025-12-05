@@ -247,6 +247,9 @@ namespace TravelExpenseClient
 
             try
             {
+                // Parse comma-separated costs
+                var costs = ParseCosts(textBoxCosts.Text);
+                
                 var request = new TravelExpenseRequest
                 {
                     ApplicantName = textBoxApplicant.Text.Trim(),
@@ -254,10 +257,10 @@ namespace TravelExpenseClient
                     Destination = textBoxDestination.Text.Trim(),
                     Purpose = textBoxPurpose.Text.Trim(),
                     Transportation = comboBoxTransportation.Text,
-                    TransportationCost = (int)numericUpDownTransportation.Value,
-                    AccommodationCost = (int)numericUpDownAccommodation.Value,
-                    MealCost = (int)numericUpDownMeal.Value,
-                    OtherCost = (int)numericUpDownOther.Value,
+                    TransportationCost = costs[0],
+                    AccommodationCost = costs[1],
+                    MealCost = costs[2],
+                    OtherCost = costs[3],
                     Remarks = textBoxRemarks.Text.Trim()
                 };
 
@@ -331,10 +334,7 @@ namespace TravelExpenseClient
             textBoxDestination.Clear();
             textBoxPurpose.Clear();
             comboBoxTransportation.SelectedIndex = -1;
-            numericUpDownTransportation.Value = 0;
-            numericUpDownAccommodation.Value = 0;
-            numericUpDownMeal.Value = 0;
-            numericUpDownOther.Value = 0;
+            textBoxCosts.Text = "0, 0, 0, 0";
             textBoxRemarks.Clear();
             UpdateTotalCost();
         }
@@ -346,26 +346,48 @@ namespace TravelExpenseClient
             textBoxDestination.Text = expense.Destination;
             textBoxPurpose.Text = expense.Purpose;
             comboBoxTransportation.Text = expense.Transportation;
-            numericUpDownTransportation.Value = expense.TransportationCost;
-            numericUpDownAccommodation.Value = expense.AccommodationCost;
-            numericUpDownMeal.Value = expense.MealCost;
-            numericUpDownOther.Value = expense.OtherCost;
+            textBoxCosts.Text = FormatCosts(expense.TransportationCost, expense.AccommodationCost, 
+                                           expense.MealCost, expense.OtherCost);
             textBoxRemarks.Text = expense.Remarks ?? string.Empty;
             UpdateTotalCost();
         }
 
-        private void NumericUpDown_ValueChanged(object sender, EventArgs e)
+        private void TextBoxCosts_TextChanged(object sender, EventArgs e)
         {
             UpdateTotalCost();
         }
 
         private void UpdateTotalCost()
         {
-            var total = (int)(numericUpDownTransportation.Value + 
-                             numericUpDownAccommodation.Value + 
-                             numericUpDownMeal.Value + 
-                             numericUpDownOther.Value);
+            var costs = ParseCosts(textBoxCosts.Text);
+            var total = costs[0] + costs[1] + costs[2] + costs[3];
             labelTotalCost.Text = $"{total:N0} 円";
+        }
+
+        private int[] ParseCosts(string costsText)
+        {
+            var costs = new int[4];
+            if (string.IsNullOrWhiteSpace(costsText))
+            {
+                return costs;
+            }
+
+            var parts = costsText.Split(',').Select(p => p.Trim()).ToArray();
+            
+            for (int i = 0; i < Math.Min(parts.Length, 4); i++)
+            {
+                if (int.TryParse(parts[i], out var value))
+                {
+                    costs[i] = value;
+                }
+            }
+            
+            return costs;
+        }
+
+        private string FormatCosts(int transport, int accommodation, int meal, int other)
+        {
+            return $"{transport}, {accommodation}, {meal}, {other}";
         }
     }
 }
