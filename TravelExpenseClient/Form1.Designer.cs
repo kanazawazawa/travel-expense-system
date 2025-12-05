@@ -258,7 +258,7 @@
             label7.Name = "label7";
             label7.Size = new Size(280, 50);
             label7.TabIndex = 12;
-            label7.Text = "費用 (交通費, 宿泊費,\r\n食事代, その他)";
+            label7.Text = "費用 (交通費, 宿泊費," + Environment.NewLine + "食事代, その他)";
             // 
             // comboBoxTransportation
             // 

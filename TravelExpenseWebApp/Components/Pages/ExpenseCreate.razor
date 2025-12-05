@@ -78,8 +78,8 @@
 
     <div class="mb-3">
         <label class="form-label">費用 (交通費, 宿泊費, 食事代, その他) *</label>
-        <InputText class="@($"form-control {GetFieldClass("Costs")}")" @bind-Value="costsInput" @bind-Value:event="oninput" placeholder="例: 10000, 5000, 3000, 1000" />
-        <div class="form-text">カンマ区切りで入力: 交通費, 宿泊費, 食事代, その他の順で入力してください</div>
+        <InputText class="@($"form-control {GetFieldClass("Costs")}")" @bind-Value="costsInput" @bind-Value:event="oninput" placeholder="例: 10000, 5000, 3000, 1000" aria-describedby="costsHelpText" />
+        <div id="costsHelpText" class="form-text">カンマ区切りで入力: 交通費, 宿泊費, 食事代, その他の順で入力してください</div>
     </div>
 
     <div class="mb-3">
