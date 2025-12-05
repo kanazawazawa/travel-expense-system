@@ -43,13 +43,7 @@
             groupBoxDetails = new GroupBox();
             textBoxRemarks = new TextBox();
             label11 = new Label();
-            numericUpDownOther = new NumericUpDown();
-            label10 = new Label();
-            numericUpDownMeal = new NumericUpDown();
-            label9 = new Label();
-            numericUpDownAccommodation = new NumericUpDown();
-            label8 = new Label();
-            numericUpDownTransportation = new NumericUpDown();
+            textBoxCosts = new TextBox();
             label7 = new Label();
             comboBoxTransportation = new ComboBox();
             label6 = new Label();
@@ -69,10 +63,6 @@
             groupBoxList.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridViewExpenses).BeginInit();
             groupBoxDetails.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)numericUpDownOther).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDownMeal).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDownAccommodation).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDownTransportation).BeginInit();
             SuspendLayout();
             // 
             // groupBoxSummary
@@ -215,13 +205,7 @@
             groupBoxDetails.Controls.Add(buttonSave);
             groupBoxDetails.Controls.Add(textBoxRemarks);
             groupBoxDetails.Controls.Add(label11);
-            groupBoxDetails.Controls.Add(numericUpDownOther);
-            groupBoxDetails.Controls.Add(label10);
-            groupBoxDetails.Controls.Add(numericUpDownMeal);
-            groupBoxDetails.Controls.Add(label9);
-            groupBoxDetails.Controls.Add(numericUpDownAccommodation);
-            groupBoxDetails.Controls.Add(label8);
-            groupBoxDetails.Controls.Add(numericUpDownTransportation);
+            groupBoxDetails.Controls.Add(textBoxCosts);
             groupBoxDetails.Controls.Add(label7);
             groupBoxDetails.Controls.Add(comboBoxTransportation);
             groupBoxDetails.Controls.Add(label6);
@@ -258,77 +242,23 @@
             label11.TabIndex = 20;
             label11.Text = "備考";
             // 
-            // numericUpDownOther
+            // textBoxCosts
             // 
-            numericUpDownOther.Location = new Point(530, 235);
-            numericUpDownOther.Maximum = new decimal(new int[] { 10000000, 0, 0, 0 });
-            numericUpDownOther.Name = "numericUpDownOther";
-            numericUpDownOther.Size = new Size(240, 31);
-            numericUpDownOther.TabIndex = 19;
-            numericUpDownOther.ValueChanged += NumericUpDown_ValueChanged;
-            // 
-            // label10
-            // 
-            label10.AutoSize = true;
-            label10.Location = new Point(420, 240);
-            label10.Name = "label10";
-            label10.Size = new Size(93, 25);
-            label10.TabIndex = 18;
-            label10.Text = "その他 (円)";
-            // 
-            // numericUpDownMeal
-            // 
-            numericUpDownMeal.Location = new Point(530, 190);
-            numericUpDownMeal.Maximum = new decimal(new int[] { 10000000, 0, 0, 0 });
-            numericUpDownMeal.Name = "numericUpDownMeal";
-            numericUpDownMeal.Size = new Size(240, 31);
-            numericUpDownMeal.TabIndex = 17;
-            numericUpDownMeal.ValueChanged += NumericUpDown_ValueChanged;
-            // 
-            // label9
-            // 
-            label9.AutoSize = true;
-            label9.Location = new Point(420, 195);
-            label9.Name = "label9";
-            label9.Size = new Size(93, 25);
-            label9.TabIndex = 16;
-            label9.Text = "食事代 (円)";
-            // 
-            // numericUpDownAccommodation
-            // 
-            numericUpDownAccommodation.Location = new Point(530, 145);
-            numericUpDownAccommodation.Maximum = new decimal(new int[] { 10000000, 0, 0, 0 });
-            numericUpDownAccommodation.Name = "numericUpDownAccommodation";
-            numericUpDownAccommodation.Size = new Size(240, 31);
-            numericUpDownAccommodation.TabIndex = 15;
-            numericUpDownAccommodation.ValueChanged += NumericUpDown_ValueChanged;
-            // 
-            // label8
-            // 
-            label8.AutoSize = true;
-            label8.Location = new Point(420, 150);
-            label8.Name = "label8";
-            label8.Size = new Size(93, 25);
-            label8.TabIndex = 14;
-            label8.Text = "宿泊費 (円)";
-            // 
-            // numericUpDownTransportation
-            // 
-            numericUpDownTransportation.Location = new Point(530, 100);
-            numericUpDownTransportation.Maximum = new decimal(new int[] { 10000000, 0, 0, 0 });
-            numericUpDownTransportation.Name = "numericUpDownTransportation";
-            numericUpDownTransportation.Size = new Size(240, 31);
-            numericUpDownTransportation.TabIndex = 13;
-            numericUpDownTransportation.ValueChanged += NumericUpDown_ValueChanged;
+            textBoxCosts.Location = new Point(530, 100);
+            textBoxCosts.Name = "textBoxCosts";
+            textBoxCosts.PlaceholderText = "例: 10000, 5000, 3000, 1000";
+            textBoxCosts.Size = new Size(240, 31);
+            textBoxCosts.TabIndex = 13;
+            textBoxCosts.TextChanged += TextBoxCosts_TextChanged;
             // 
             // label7
             // 
             label7.AutoSize = true;
             label7.Location = new Point(420, 105);
             label7.Name = "label7";
-            label7.Size = new Size(93, 25);
+            label7.Size = new Size(280, 50);
             label7.TabIndex = 12;
-            label7.Text = "交通費 (円)";
+            label7.Text = "費用 (交通費, 宿泊費," + Environment.NewLine + "食事代, その他)";
             // 
             // comboBoxTransportation
             // 
@@ -473,10 +403,6 @@
             ((System.ComponentModel.ISupportInitialize)dataGridViewExpenses).EndInit();
             groupBoxDetails.ResumeLayout(false);
             groupBoxDetails.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)numericUpDownOther).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDownMeal).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDownAccommodation).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDownTransportation).EndInit();
             ResumeLayout(false);
         }
 
@@ -506,13 +432,7 @@
         private Label label6;
         private ComboBox comboBoxTransportation;
         private Label label7;
-        private NumericUpDown numericUpDownTransportation;
-        private Label label8;
-        private NumericUpDown numericUpDownAccommodation;
-        private Label label9;
-        private NumericUpDown numericUpDownMeal;
-        private Label label10;
-        private NumericUpDown numericUpDownOther;
+        private TextBox textBoxCosts;
         private Label label11;
         private TextBox textBoxRemarks;
         private Button buttonCancel;
