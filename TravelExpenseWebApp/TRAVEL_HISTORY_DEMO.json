@@ -1,0 +1,136 @@
+{
+  "userId": "tanaka.taro@example.com",
+  "travelHistory": [
+    {
+      "id": "TRV-2024-001",
+      "date": "2024-11-15",
+      "destination": "大阪",
+      "purpose": "顧客訪問",
+      "transportation": {
+        "type": "新幹線（普通車指定席）",
+        "cost": 13620,
+        "distance": 550
+      },
+      "accommodation": {
+        "nights": 1,
+        "costPerNight": 10500,
+        "totalCost": 10500
+      },
+      "dailyAllowance": 3000,
+      "otherExpenses": [
+        {
+          "type": "タクシー",
+          "cost": 2500,
+          "reason": "終電後の移動"
+        }
+      ],
+      "totalAmount": 29620,
+      "status": "承認済み"
+    },
+    {
+      "id": "TRV-2024-002",
+      "date": "2024-10-20",
+      "destination": "名古屋",
+      "purpose": "会議",
+      "transportation": {
+        "type": "新幹線（普通車指定席）",
+        "cost": 10560,
+        "distance": 350
+      },
+      "accommodation": null,
+      "dailyAllowance": 3000,
+      "otherExpenses": [],
+      "totalAmount": 13560,
+      "status": "承認済み"
+    },
+    {
+      "id": "TRV-2024-003",
+      "date": "2024-09-10",
+      "destination": "福岡",
+      "purpose": "営業",
+      "transportation": {
+        "type": "航空機（普通席）",
+        "cost": 32000,
+        "distance": 1100
+      },
+      "accommodation": {
+        "nights": 2,
+        "costPerNight": 11000,
+        "totalCost": 22000
+      },
+      "dailyAllowance": 6000,
+      "otherExpenses": [
+        {
+          "type": "駐車場",
+          "cost": 1500,
+          "reason": "空港駐車場"
+        }
+      ],
+      "totalAmount": 61500,
+      "status": "承認済み"
+    },
+    {
+      "id": "TRV-2023-015",
+      "date": "2023-12-05",
+      "destination": "大阪",
+      "purpose": "顧客訪問",
+      "transportation": {
+        "type": "新幹線（普通車指定席）",
+        "cost": 13620,
+        "distance": 550
+      },
+      "accommodation": {
+        "nights": 1,
+        "costPerNight": 10800,
+        "totalCost": 10800
+      },
+      "dailyAllowance": 3000,
+      "otherExpenses": [],
+      "totalAmount": 27420,
+      "status": "承認済み"
+    },
+    {
+      "id": "TRV-2023-012",
+      "date": "2023-11-18",
+      "destination": "名古屋",
+      "purpose": "研修",
+      "transportation": {
+        "type": "新幹線（普通車指定席）",
+        "cost": 10560,
+        "distance": 350
+      },
+      "accommodation": null,
+      "dailyAllowance": 3000,
+      "otherExpenses": [],
+      "totalAmount": 13560,
+      "status": "承認済み"
+    }
+  ],
+  "frequentDestinations": [
+    {
+      "destination": "大阪",
+      "frequency": 12,
+      "averageTransportationCost": 13620,
+      "commonTransportation": "新幹線（普通車指定席）",
+      "commonAccommodationCost": 10600,
+      "commonPurpose": "顧客訪問"
+    },
+    {
+      "destination": "名古屋",
+      "frequency": 8,
+      "averageTransportationCost": 10560,
+      "commonTransportation": "新幹線（普通車指定席）",
+      "commonAccommodationCost": null,
+      "commonPurpose": "会議"
+    },
+    {
+      "destination": "福岡",
+      "frequency": 5,
+      "averageTransportationCost": 31500,
+      "commonTransportation": "航空機（普通席）",
+      "commonAccommodationCost": 11000,
+      "commonPurpose": "営業"
+    }
+  ],
+  "note": "このファイルは開発・デモ用の過去出張履歴です。本番環境ではデータベースから取得します。"
+}

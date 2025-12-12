@@ -1,0 +1,16 @@
+{
+  "userId": "yamada.hanako@example.com",
+  "displayName": "山田 花子",
+  "department": "技術部",
+  "position": "部長",
+  "employeeId": "EMP-20100401",
+  "joinDate": "2010-04-01",
+  "travelExpenseSettings": {
+    "dailyAllowance": 3500,
+    "accommodationLimit": 13000,
+    "canUseGreenCar": true,
+    "canUseBusinessClass": true,
+    "approvalRequired": false
+  },
+  "note": "部長権限: グリーン車・ビジネスクラス利用可"
+}

@@ -1,0 +1,16 @@
+{
+  "userId": "tanaka.taro@example.com",
+  "displayName": "田中 太郎",
+  "department": "営業部",
+  "position": "課長",
+  "employeeId": "EMP-20231001",
+  "joinDate": "2015-04-01",
+  "travelExpenseSettings": {
+    "dailyAllowance": 3000,
+    "accommodationLimit": 11000,
+    "canUseGreenCar": false,
+    "canUseBusinessClass": false,
+    "approvalRequired": false
+  },
+  "note": "このファイルは開発・デモ用です。本番環境では Microsoft Entra ID から情報を取得するのが望ましいです。"
+}

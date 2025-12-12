@@ -1,0 +1,30 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "TenantId": "YOUR_TENANT_ID",
+    "ClientId": "YOUR_CLIENT_ID",
+    "ClientSecret": "YOUR_CLIENT_SECRET",
+    "CallbackPath": "/signin-oidc",
+    "SignedOutCallbackPath": "/signout-callback-oidc",
+    "ApiClientId": "YOUR_API_CLIENT_ID"
+  },
+  "ApiSettings": {
+    "BaseUrl": "https://localhost:7115/api/TravelExpenses"
+  },
+  "AzureAIAgent": {
+    "ProjectEndpoint": "YOUR_AI_PROJECT_ENDPOINT",
+    "AgentName": "YOUR_AGENT_NAME",
+    "ModelDeploymentName": "gpt-4o"
+  },
+  "AzureOpenAI": {
+    "Endpoint": "YOUR_AZURE_OPENAI_ENDPOINT",
+    "RealtimeDeploymentName": "gpt-realtime",
+    "ApiKey": "YOUR_AZURE_OPENAI_API_KEY"
+  }
+}

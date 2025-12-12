@@ -17,6 +17,11 @@
   - 自然言語での旅費情報入力
   - 画像アップロード・クリップボード画像ペースト対応
   - フォーム自動入力とハイライト表示
+- ✅ **音声チャット機能** - GPT Realtime API による音声対話
+  - リアルタイム音声認識と応答
+  - テキストチャットと音声チャットの切り替え可能
+  - サーバー側VAD（音声アクティビティ検出）
+  - 自然な会話による旅費情報入力
 - ✅ Microsoft Entra ID による認証・認可
 - ✅ Azure Table Storage によるデータ永続化
 - ✅ マルチクライアント対応（Web/Desktop）
@@ -24,6 +29,8 @@
 ## セットアップ
 
 ### 1. 必須：開発環境用設定ファイルの作成
+
+**⚠️ 重要**: すべての機密情報は `appsettings.Development.json` に保存してください。このファイルは `.gitignore` で除外されており、GitHubにコミットされません。
 
 #### TravelExpenseApi/appsettings.Development.json
 ```json
@@ -39,6 +46,14 @@
 ```
 
 #### TravelExpenseWebApp/appsettings.Development.json
+
+**テンプレートファイルをコピー:**
+```bash
+cd TravelExpenseWebApp
+cp appsettings.Development.json.template appsettings.Development.json
+```
+
+**または、以下の内容で新規作成:**
 ```json
 {
   "AzureAd": {
@@ -54,13 +69,30 @@
     "BaseUrl": "https://localhost:7115/api/TravelExpenses"
   },
   "AzureAIAgent": {
-    "ProjectEndpoint": "https://yourproject.services.ai.azure.com/api/projects/yourproject",
-    "AgentId": "asst_xxxxxxxxxxxxx"
+    "ProjectEndpoint": "YOUR_AI_PROJECT_ENDPOINT",
+    "AgentName": "YOUR_AGENT_NAME",
+    "ModelDeploymentName": "gpt-4o"
+  },
+  "AzureOpenAI": {
+    "Endpoint": "YOUR_AZURE_OPENAI_ENDPOINT",
+    "RealtimeDeploymentName": "gpt-realtime",
+    "ApiKey": "YOUR_AZURE_OPENAI_API_KEY"
   }
 }
 ```
 
 **AI Agent機能を使用する場合は、`AI_AGENT_SETUP.md` を参照して設定してください。**
+
+**🔐 セキュリティのベストプラクティス:**
+
+機密情報はUser Secretsで管理することを強く推奨します：
+
+```bash
+cd TravelExpenseWebApp
+dotnet user-secrets init
+dotnet user-secrets set "AzureAd:ClientSecret" "YOUR_CLIENT_SECRET"
+dotnet user-secrets set "AzureOpenAI:ApiKey" "YOUR_API_KEY"
+```
 
 ### 2. Microsoft Entra ID アプリ登録
 
@@ -123,6 +155,58 @@ dotnet run
 - `AzureAd__ClientSecret`
 - `AzureAd__ApiClientId`
 - `ApiSettings__BaseUrl`
+- `AzureAIAgent__ProjectEndpoint`
+- `AzureAIAgent__AgentName`
+- `AzureAIAgent__ModelDeploymentName`
+- `AzureOpenAI__Endpoint`
+- `AzureOpenAI__RealtimeDeploymentName`
+- `AzureOpenAI__ApiKey`
+
+## 🎤 音声チャット機能の使い方
+
+### 前提条件
+- Azure OpenAI Service で `gpt-4o-realtime-preview` モデルをデプロイ
+- サポートされているリージョン: 米国東部2 (EastUS2)、スウェーデン中部 (SwedenCentral)
+- HTTPS 接続（必須）
+- マイクアクセス許可
+
+### 主な機能
+✨ **スマート出張アシスタント**
+- 🎯 過去の出張パターンを学習して自動提案
+- 📅 日本時間に対応した日付計算（「明後日」「来週火曜」など）
+- ⚡ リアルタイムでフォームに反映
+- 🗣️ 自然な会話で情報収集
+- 🔄 「適当に入れておいて」で過去パターンから自動入力
+
+### 使い方
+1. `/expenses/create` ページにアクセス
+2. 右側の **「音声チャット」** タブをクリック
+3. **「音声会話を開始」** ボタンを押す
+4. ブラウザのマイクアクセス許可を承認
+5. 出張情報を話す
+
+**会話例:**
+```
+User: 「来週火曜から大阪に出張で、適当に入れておいて」
+AI  : 「入力しました。他にありますか？」
+→ 過去パターンから交通費・宿泊費・日当を自動入力
+→ フォームに即座に反映（緑色ハイライト）
+```
+
+### デモ用ファイル
+以下のファイルはデモ・開発用です（`.gitignore` で除外済み）：
+- `USER_PROFILE_DEMO.json` - ユーザープロファイル（役職・旅費規程）
+- `TRAVEL_HISTORY_DEMO.json` - 過去の出張履歴（学習データ）
+- `VOICE_AGENT_INSTRUCTIONS.md` - AI エージェントの指示書
+
+**本番環境では**:
+- ユーザープロファイル → Microsoft Entra ID から取得
+- 出張履歴 → Azure Table Storage から取得
+
+### トラブルシューティング
+- **音声が認識されない**: マイクアクセス許可を確認
+- **接続エラー**: `appsettings.Development.json` の `AzureOpenAI` セクションを確認
+- **エラー詳細**: F12でブラウザの開発者コンソールを開いて確認
 
 ## セキュリティ
 

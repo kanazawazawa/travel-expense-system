@@ -26,6 +26,16 @@ builder.Services.AddAuthorization();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Enable detailed errors for Blazor Server (development only)
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddServerSideBlazor()
+        .AddCircuitOptions(options =>
+        {
+            options.DetailedErrors = true;
+        });
+}
+
 builder.Services.AddControllersWithViews()
     .AddMicrosoftIdentityUI();
 
@@ -39,6 +49,7 @@ builder.Services.AddScoped<TravelExpenseWebApp.Services.TravelExpenseApiService>
 builder.Services.AddSingleton<TravelExpenseWebApp.Services.TravelExpenseUIUpdateService>();
 builder.Services.AddSingleton<TravelExpenseWebApp.Services.AzureAIAgentService>();
 builder.Services.AddSingleton<TravelExpenseWebApp.Services.AgentModeService>();
+builder.Services.AddScoped<TravelExpenseWebApp.Services.RealtimeAudioService>();
 
 builder.Services.AddCascadingAuthenticationState();
 

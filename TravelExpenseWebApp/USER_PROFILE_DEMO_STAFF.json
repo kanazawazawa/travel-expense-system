@@ -1,0 +1,16 @@
+{
+  "userId": "sato.jiro@example.com",
+  "displayName": "佐藤 次郎",
+  "department": "営業部",
+  "position": "一般社員",
+  "employeeId": "EMP-20220401",
+  "joinDate": "2022-04-01",
+  "travelExpenseSettings": {
+    "dailyAllowance": 2000,
+    "accommodationLimit": 9000,
+    "canUseGreenCar": false,
+    "canUseBusinessClass": false,
+    "approvalRequired": true
+  },
+  "note": "一般社員: 事前承認必須"
+}

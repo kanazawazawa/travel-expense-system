@@ -130,7 +130,23 @@
 
         <div class="col-lg-5">
             <div class="chat-container-wrapper">
-                <ChatComponent />
+                <div class="chat-tabs">
+                    <button class="chat-tab @(activeTab == "text" ? "active" : "")" @onclick="@(() => SetActiveTab("text"))">
+                        <i class="bi bi-chat-dots"></i> テキストチャット
+                    </button>
+                    <button class="chat-tab @(activeTab == "voice" ? "active" : "")" @onclick="@(() => SetActiveTab("voice"))">
+                        <i class="bi bi-mic-fill"></i> 音声チャット
+                    </button>
+                </div>
+                
+                @if (activeTab == "text")
+                {
+                    <ChatComponent />
+                }
+                else
+                {
+                    <VoiceChatComponent OnExpenseDataReceived="HandleVoiceExpenseData" />
+                }
             </div>
         </div>
     </div>
@@ -150,6 +166,7 @@ private TravelExpenseRequest request { get; set; } = new()
 private bool isSubmitting = false;
 private string? errorMessage;
 private string? successMessage;
+private string activeTab = "text"; // Default to text chat
 
 // AI auto-fill highlight tracking
 private HashSet<string> highlightedFields = new();
@@ -164,6 +181,11 @@ private int TotalAmount =>
 private string GetFieldClass(string fieldName)
 {
     return highlightedFields.Contains(fieldName) ? "ai-updated" : "";
+}
+
+private void SetActiveTab(string tab)
+{
+    activeTab = tab;
 }
 
 protected override async Task OnInitializedAsync()
@@ -291,6 +313,97 @@ private void HandleTravelExpenseUIUpdate(TravelExpenseUIUpdateInstruction instru
     }, null, TimeSpan.FromSeconds(10), Timeout.InfiniteTimeSpan);
 }
 
+/// <summary>
+/// 音声チャットから旅費データを受信した時の処理
+/// </summary>
+private void HandleVoiceExpenseData(TravelExpenseData data)
+{
+    Console.WriteLine("🎙️ ExpenseCreate: Received voice expense data!");
+    
+    // Clear previous highlights
+    highlightedFields.Clear();
+    
+    if (!string.IsNullOrEmpty(data.Destination))
+    {
+        request.Destination = data.Destination;
+        highlightedFields.Add("Destination");
+        Console.WriteLine($"   ✅ 出張先: {data.Destination}");
+    }
+
+    if (data.TravelDate.HasValue)
+    {
+        request.TravelDate = data.TravelDate.Value;
+        highlightedFields.Add("TravelDate");
+        Console.WriteLine($"   ✅ 出張日: {data.TravelDate.Value:yyyy-MM-dd}");
+    }
+
+    if (!string.IsNullOrEmpty(data.Purpose))
+    {
+        request.Purpose = data.Purpose;
+        highlightedFields.Add("Purpose");
+        Console.WriteLine($"   ✅ 目的: {data.Purpose}");
+    }
+
+    if (!string.IsNullOrEmpty(data.TransportationType))
+    {
+        request.Transportation = data.TransportationType;
+        highlightedFields.Add("Transportation");
+        Console.WriteLine($"   ✅ 交通手段: {data.TransportationType}");
+    }
+
+    if (data.TransportationCost.HasValue)
+    {
+        request.TransportationCost = data.TransportationCost.Value;
+        highlightedFields.Add("TransportationCost");
+        Console.WriteLine($"   ✅ 交通費: {data.TransportationCost.Value:N0}円");
+    }
+
+    if (data.AccommodationCost.HasValue)
+    {
+        request.AccommodationCost = data.AccommodationCost.Value;
+        highlightedFields.Add("AccommodationCost");
+        Console.WriteLine($"   ✅ 宿泊費: {data.AccommodationCost.Value:N0}円");
+    }
+
+    if (data.DailyAllowance.HasValue)
+    {
+        // 日当は「その他」に入れる（既存のフォームには日当フィールドがないため）
+        request.OtherCost += data.DailyAllowance.Value;
+        highlightedFields.Add("OtherCost");
+        Console.WriteLine($"   ✅ 日当: {data.DailyAllowance.Value:N0}円（その他に加算）");
+    }
+
+    if (!string.IsNullOrEmpty(data.Notes))
+    {
+        // 既存の備考に追加
+        if (!string.IsNullOrEmpty(request.Remarks))
+        {
+            request.Remarks += "\n\n" + data.Notes;
+        }
+        else
+        {
+            request.Remarks = data.Notes;
+        }
+        highlightedFields.Add("Remarks");
+        Console.WriteLine($"   ✅ 備考を追加");
+    }
+
+    if (data.IsAutoFilled)
+    {
+        Console.WriteLine("   ℹ️ 過去パターンから自動入力されました");
+    }
+
+    InvokeAsync(StateHasChanged);
+    
+    // Remove highlights after 10 seconds
+    highlightTimer?.Dispose();
+    highlightTimer = new System.Threading.Timer(_ =>
+    {
+        highlightedFields.Clear();
+        InvokeAsync(StateHasChanged);
+    }, null, TimeSpan.FromSeconds(10), Timeout.InfiniteTimeSpan);
+}
+
 public void Dispose()
 {
     TravelExpenseUIUpdateService.TravelExpenseUIUpdateRequested -= HandleTravelExpenseUIUpdate;
@@ -359,5 +472,53 @@ public void Dispose()
     /* チャットコンテナの高さを親に合わせる */
     .chat-container-wrapper .chat-container {
         height: 100%;
+    }
+    
+    .chat-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 0;
+        background-color: #f8f9fa;
+        border-radius: 8px 8px 0 0;
+        border: 1px solid #dee2e6;
+        border-bottom: none;
+        padding: 4px;
+    }
+    
+    .chat-tab {
+        flex: 1;
+        padding: 10px 16px;
+        border: none;
+        background-color: transparent;
+        color: #6c757d;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    
+    .chat-tab:hover {
+        background-color: #e9ecef;
+        color: #495057;
+    }
+    
+    .chat-tab.active {
+        background-color: white;
+        color: #0d6efd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .chat-tab i {
+        font-size: 1.1rem;
+    }
+    
+    .chat-container-wrapper .chat-container,
+    .chat-container-wrapper .voice-chat-container {
+        border-radius: 0 0 8px 8px;
+        border-top: none;
     }
 </style>

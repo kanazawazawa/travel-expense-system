@@ -1,0 +1,448 @@
+@using TravelExpenseWebApp.Services
+@using TravelExpenseWebApp.Models
+@inject RealtimeAudioService RealtimeService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+@rendermode InteractiveServer
+
+@code {
+    [Parameter]
+    public EventCallback<TravelExpenseData> OnExpenseDataReceived { get; set; }
+}
+
+<div class="voice-chat-container">
+    <div class="voice-chat-header">
+        <h5 class="mb-0">
+            <i class="bi bi-mic-fill me-2"></i>音声アシスタント
+        </h5>
+        <div class="connection-status @(isConnected ? "connected" : "disconnected")">
+            @if (isConnected)
+            {
+                <i class="bi bi-circle-fill"></i>
+                <span>接続中</span>
+            }
+            else
+            {
+                <i class="bi bi-circle"></i>
+                <span>未接続</span>
+            }
+        </div>
+    </div>
+
+    <div class="voice-chat-body">
+        @if (!isConnected)
+        {
+            <div class="voice-instructions">
+                <i class="bi bi-info-circle text-primary mb-3" style="font-size: 2rem;"></i>
+                <p>ボタンを押して音声アシスタントと会話を開始できます。</p>
+                <p class="text-muted small">
+                    出張に関する情報を話すと、自動的にフォームに入力されます。
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="conversation-area">
+                @if (!string.IsNullOrEmpty(userTranscript))
+                {
+                    <div class="transcript-box user-transcript">
+                        <div class="transcript-label">あなた:</div>
+                        <div class="transcript-text">@userTranscript</div>
+                    </div>
+                }
+
+                @if (isListening)
+                {
+                    <div class="listening-indicator">
+                        <div class="pulse-ring"></div>
+                        <i class="bi bi-mic-fill"></i>
+                        <span>聞いています...</span>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger alert-sm">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        @errorMessage
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="voice-chat-controls">
+        @if (!isConnected)
+        {
+            <button class="btn btn-primary btn-lg w-100" @onclick="StartVoiceChat" disabled="@isConnecting">
+                @if (isConnecting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span>接続中...</span>
+                }
+                else
+                {
+                    <i class="bi bi-mic-fill me-2"></i>
+                    <span>音声会話を開始</span>
+                }
+            </button>
+        }
+        else
+        {
+            <div class="d-flex gap-2">
+                <button class="btn btn-danger flex-grow-1" @onclick="StopVoiceChat">
+                    <i class="bi bi-stop-circle me-2"></i>
+                    会話を終了
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .voice-chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+        background-color: white;
+    }
+
+    .voice-chat-header {
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .connection-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.875rem;
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+
+    .connection-status.connected {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .connection-status.disconnected {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .connection-status i {
+        font-size: 0.7rem;
+    }
+
+    .voice-chat-body {
+        flex-grow: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .voice-instructions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        height: 100%;
+        padding: 40px 20px;
+    }
+
+    .voice-instructions p {
+        margin-bottom: 8px;
+    }
+
+    .conversation-area {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .transcript-box {
+        padding: 12px 16px;
+        border-radius: 12px;
+        margin-bottom: 10px;
+    }
+
+    .user-transcript {
+        background-color: #e3f2fd;
+        border-left: 4px solid #2196f3;
+    }
+
+    .transcript-label {
+        font-weight: 600;
+        font-size: 0.875rem;
+        margin-bottom: 6px;
+        color: #495057;
+    }
+
+    .transcript-text {
+        font-size: 1rem;
+        line-height: 1.5;
+        color: #212529;
+    }
+
+    .listening-indicator {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 30px;
+        gap: 12px;
+        position: relative;
+    }
+
+    .listening-indicator i {
+        font-size: 3rem;
+        color: #0d6efd;
+        z-index: 2;
+    }
+
+    .listening-indicator span {
+        font-size: 1rem;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .pulse-ring {
+        position: absolute;
+        width: 80px;
+        height: 80px;
+        border: 3px solid #0d6efd;
+        border-radius: 50%;
+        animation: pulse-ring 1.5s ease-out infinite;
+    }
+
+    @@keyframes pulse-ring {
+        0% {
+            transform: scale(0.8);
+            opacity: 1;
+        }
+        100% {
+            transform: scale(1.5);
+            opacity: 0;
+        }
+    }
+
+    .voice-chat-controls {
+        padding: 15px;
+        background-color: white;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .alert-sm {
+        font-size: 0.875rem;
+        padding: 8px 12px;
+    }
+</style>
+
+@code {
+    private bool isConnected = false;
+    private bool isConnecting = false;
+    private bool isListening = false;
+    private string userTranscript = string.Empty;
+    private string errorMessage = string.Empty;
+    private DotNetObjectReference<VoiceChatComponent>? objRef;
+
+    protected override void OnInitialized()
+    {
+        // Subscribe to service events
+        RealtimeService.OnConnected += HandleConnected;
+        RealtimeService.OnDisconnected += HandleDisconnected;
+        RealtimeService.OnTranscriptReceived += HandleTranscriptReceived;
+        RealtimeService.OnAudioReceived += HandleAudioReceived;
+        RealtimeService.OnError += HandleError;
+        RealtimeService.OnExpenseDataExtracted += HandleExpenseDataExtracted;
+
+        objRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialize audio handling JavaScript
+            await JSRuntime.InvokeVoidAsync("voiceChat.initialize", objRef);
+        }
+    }
+
+    private async Task StartVoiceChat()
+    {
+        try
+        {
+            isConnecting = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            var connected = await RealtimeService.ConnectAsync();
+            
+            if (connected)
+            {
+                // Start audio capture in JavaScript
+                await JSRuntime.InvokeVoidAsync("voiceChat.startAudioCapture");
+                isListening = true;
+            }
+            else
+            {
+                errorMessage = "音声サービスに接続できませんでした";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"エラー: {ex.Message}";
+        }
+        finally
+        {
+            isConnecting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StopVoiceChat()
+    {
+        try
+        {
+            // Stop audio capture
+            await JSRuntime.InvokeVoidAsync("voiceChat.stopAudioCapture");
+            
+            // Disconnect from service
+            await RealtimeService.DisconnectAsync();
+            
+            isListening = false;
+            userTranscript = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"エラー: {ex.Message}";
+        }
+    }
+
+    [JSInvokable]
+    public async Task SendAudioData(int[] audioDataArray)
+    {
+        try
+        {
+            if (audioDataArray == null || audioDataArray.Length == 0)
+            {
+                Console.WriteLine("⚠️ Empty audio data received");
+                return;
+            }
+
+            // Convert int[] to byte[]
+            byte[] audioData = audioDataArray.Select(i => (byte)i).ToArray();
+            
+            Console.WriteLine($"📤 Sending {audioData.Length} bytes of audio data");
+            await RealtimeService.SendAudioAsync(audioData);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error sending audio: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            errorMessage = $"音声送信エラー: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [JSInvokable]
+    public async Task InterruptResponse()
+    {
+        try
+        {
+            Console.WriteLine("🛑 User interrupted - cancelling AI response");
+            await RealtimeService.CancelResponseAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error interrupting response: {ex.Message}");
+        }
+    }
+
+    private void HandleConnected()
+    {
+        isConnected = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleDisconnected()
+    {
+        isConnected = false;
+        isListening = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleTranscriptReceived(string transcript)
+    {
+        userTranscript = transcript;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async void HandleAudioReceived(byte[] audioData)
+    {
+        try
+        {
+            // Play audio through JavaScript
+            await JSRuntime.InvokeVoidAsync("voiceChat.playAudio", audioData);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error playing audio: {ex.Message}");
+        }
+    }
+
+    private void HandleError(string error)
+    {
+        // "Cancellation failed" エラーは表示しない（正常な動作）
+        if (error.Contains("Cancellation failed", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"ℹ️ Info: {error} (正常な動作です)");
+            return;
+        }
+        
+        errorMessage = error;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async void HandleExpenseDataExtracted(TravelExpenseData data)
+    {
+        try
+        {
+            Console.WriteLine($"📊 Expense data extracted: {System.Text.Json.JsonSerializer.Serialize(data)}");
+            
+            // InvokeAsync を使用して Blazor のレンダリングコンテキスト内で実行
+            await InvokeAsync(async () =>
+            {
+                await OnExpenseDataReceived.InvokeAsync(data);
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error handling expense data: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        RealtimeService.OnConnected -= HandleConnected;
+        RealtimeService.OnDisconnected -= HandleDisconnected;
+        RealtimeService.OnTranscriptReceived -= HandleTranscriptReceived;
+        RealtimeService.OnAudioReceived -= HandleAudioReceived;
+        RealtimeService.OnError -= HandleError;
+        RealtimeService.OnExpenseDataExtracted -= HandleExpenseDataExtracted;
+        
+        objRef?.Dispose();
+    }
+}
