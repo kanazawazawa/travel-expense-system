@@ -97,16 +97,17 @@ namespace TravelExpenseWebApp.Services
                 _logger.LogInformation("Agent Name: {AgentName}", _agentName);
                 _logger.LogInformation("Model Deployment: {ModelDeploymentName}", _modelDeploymentName);
                 
+                // Azure App Service環境では ManagedIdentity を優先、ローカルでは VisualStudio/AzureCli を使用
                 var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
                 {
                     ExcludeEnvironmentCredential = false,
                     ExcludeManagedIdentityCredential = false,
-                    ExcludeSharedTokenCacheCredential = false,
+                    ExcludeSharedTokenCacheCredential = true, // Azure App Serviceでは動作しないため除外
                     ExcludeVisualStudioCredential = false,
                     ExcludeVisualStudioCodeCredential = false,
                     ExcludeAzureCliCredential = false,
-                    ExcludeAzurePowerShellCredential = false,
-                    ExcludeInteractiveBrowserCredential = true // Disable browser pop-up in production
+                    ExcludeAzurePowerShellCredential = true,
+                    ExcludeInteractiveBrowserCredential = true
                 });
                 
                 // Initialize AIProjectClient

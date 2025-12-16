@@ -14,11 +14,16 @@ namespace TravelExpenseApi.Controllers;
 public class TravelExpensesController : ControllerBase
 {
     private readonly TravelExpenseService _service;
+    private readonly FraudDetectionService _fraudDetectionService;
     private readonly ILogger<TravelExpensesController> _logger;
 
-    public TravelExpensesController(TravelExpenseService service, ILogger<TravelExpensesController> logger)
+    public TravelExpensesController(
+        TravelExpenseService service, 
+        FraudDetectionService fraudDetectionService,
+        ILogger<TravelExpensesController> logger)
     {
         _service = service;
+        _fraudDetectionService = fraudDetectionService;
         _logger = logger;
     }
 
@@ -189,6 +194,47 @@ public class TravelExpensesController : ControllerBase
         {
             _logger.LogError(ex, "Failed to get summary");
             return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// 不正検知チェックを実行
+    /// </summary>
+    [HttpPost("{partitionKey}/{rowKey}/fraud-check")]
+    public async Task<ActionResult<TravelExpenseResponse>> RunFraudCheck(string partitionKey, string rowKey)
+    {
+        try
+        {
+            _logger.LogInformation("Running fraud check for expense: {PartitionKey}/{RowKey}", partitionKey, rowKey);
+
+            // 不正検知を実行
+            var fraudCheckResult = await _fraudDetectionService.CheckExpenseAsync(partitionKey, rowKey);
+
+            // 結果をデータベースに保存
+            var expense = await _service.GetExpenseByIdAsync(partitionKey, rowKey);
+            if (expense == null)
+            {
+                return NotFound();
+            }
+
+            // TravelExpenseServiceに不正検知結果を更新するメソッドを呼び出す
+            var updatedExpense = await _service.UpdateFraudCheckResultAsync(
+                partitionKey, 
+                rowKey, 
+                fraudCheckResult.Result, 
+                fraudCheckResult.Details);
+
+            if (updatedExpense == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(updatedExpense);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to run fraud check");
+            return StatusCode(500, $"Internal server error: {ex.Message}");
         }
     }
 }

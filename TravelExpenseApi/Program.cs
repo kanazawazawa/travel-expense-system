@@ -28,6 +28,9 @@ builder.Services.AddControllers();
 // Travel Expense Service を DI コンテナに登録
 builder.Services.AddSingleton<TravelExpenseService>();
 
+// Fraud Detection Service を DI コンテナに登録
+builder.Services.AddSingleton<FraudDetectionService>();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

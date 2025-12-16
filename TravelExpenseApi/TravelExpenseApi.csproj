@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Data.Tables" Version="12.11.0" />
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+    <PackageReference Include="Microsoft.Agents.AI.AzureAI" Version="1.0.0-preview.251204.1" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.79.2" />
     <PackageReference Include="Microsoft.Identity.Web" Version="4.1.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />

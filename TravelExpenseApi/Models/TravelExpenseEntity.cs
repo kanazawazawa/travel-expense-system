@@ -4,7 +4,7 @@ using Azure.Data.Tables;
 namespace TravelExpenseApi.Models;
 
 /// <summary>
-/// —·”ï\¿ƒGƒ“ƒeƒBƒeƒB
+/// æ—…è²»ç”³è«‹ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£
 /// </summary>
 public class TravelExpenseEntity : ITableEntity
 {
@@ -15,48 +15,60 @@ public class TravelExpenseEntity : ITableEntity
     public ETag ETag { get; set; }
 
     // Business properties
-    /// <summary>\¿“ú (RowKey as ISO 8601 format)</summary>
+    /// <summary>ç”³è«‹æ—¥ (RowKey as ISO 8601 format)</summary>
     public DateTime ApplicationDate { get; set; }
     
-    /// <summary>\¿Ò–¼</summary>
+    /// <summary>ç”³è«‹è€…å</summary>
     public string ApplicantName { get; set; } = default!;
     
-    /// <summary>o’£“ú</summary>
+    /// <summary>å‡ºå¼µæ—¥</summary>
     public DateTime TravelDate { get; set; }
     
-    /// <summary>o’£æ</summary>
+    /// <summary>å‡ºå¼µå…ˆ</summary>
     public string Destination { get; set; } = default!;
     
-    /// <summary>–Ú“I</summary>
+    /// <summary>ç›®çš„</summary>
     public string Purpose { get; set; } = default!;
     
-    /// <summary>Œğ’Êè’i</summary>
+    /// <summary>äº¤é€šæ‰‹æ®µ</summary>
     public string Transportation { get; set; } = default!;
     
-    /// <summary>Œğ’Ê”ï (‰~)</summary>
+    /// <summary>äº¤é€šè²» (å††)</summary>
     public int TransportationCost { get; set; }
     
-    /// <summary>h”‘”ï (‰~)</summary>
+    /// <summary>å®¿æ³Šè²» (å††)</summary>
     public int AccommodationCost { get; set; }
     
-    /// <summary>H–‘ã (‰~)</summary>
+    /// <summary>é£Ÿäº‹ä»£ (å††)</summary>
     public int MealCost { get; set; }
     
-    /// <summary>‚»‚Ì‘¼ (‰~)</summary>
+    /// <summary>ãã®ä»– (å††)</summary>
     public int OtherCost { get; set; }
     
-    /// <summary>‡Œv‹àŠz (‰~)</summary>
+    /// <summary>åˆè¨ˆé‡‘é¡ (å††)</summary>
     public int TotalAmount { get; set; }
     
-    /// <summary>”õl</summary>
+    /// <summary>å‚™è€ƒ</summary>
     public string? Remarks { get; set; }
     
-    /// <summary>ƒXƒe[ƒ^ƒX (³”F‘Ò‚¿, ³”FÏ‚İ, \¿Œ”)</summary>
-    public string Status { get; set; } = "³”F‘Ò‚¿";
+    /// <summary>ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ (æ‰¿èªå¾…ã¡, æ‰¿èªæ¸ˆã¿, ç”³è«‹ä»¶æ•°)</summary>
+    public string Status { get; set; } = "æ‰¿èªå¾…ã¡";
+    
+    /// <summary>ä¸æ­£æ¤œçŸ¥ãƒã‚§ãƒƒã‚¯å®Œäº†ãƒ•ãƒ©ã‚°</summary>
+    public bool? FraudCheckCompleted { get; set; }
+    
+    /// <summary>ä¸æ­£æ¤œçŸ¥ãƒã‚§ãƒƒã‚¯æ—¥æ™‚</summary>
+    public DateTime? FraudCheckDate { get; set; }
+    
+    /// <summary>ä¸æ­£æ¤œçŸ¥çµæœ (OK, WARNING, ERROR)</summary>
+    public string? FraudCheckResult { get; set; }
+    
+    /// <summary>ä¸æ­£æ¤œçŸ¥è©³ç´°ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸</summary>
+    public string? FraudCheckDetails { get; set; }
 
     public TravelExpenseEntity()
     {
-        // PartitionKey: ”NŒ‚Åƒp[ƒeƒBƒVƒ‡ƒ“•ªŠ„ (—á: "2025-11")
-        // RowKey: \¿“ú‚Ìƒ†ƒj[ƒNID (—á: "20251120-123456-guid")
+        // PartitionKey: å¹´æœˆã§ãƒ‘ãƒ¼ãƒ†ã‚£ã‚·ãƒ§ãƒ³åˆ†å‰² (ä¾‹: "2025-11")
+        // RowKey: ç”³è«‹æ—¥æ™‚ã®ãƒ¦ãƒ‹ãƒ¼ã‚¯ID (ä¾‹: "20251120-123456-guid")
     }
 }

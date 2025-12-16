@@ -5,8 +5,8 @@ using TravelExpenseApi.Models;
 namespace TravelExpenseApi.Services;
 
 /// <summary>
-/// —·”ï\¿ƒf[ƒ^ƒAƒNƒZƒXƒT[ƒrƒX
-/// Azure Table Storage‚Æ‚Ì’ÊM‚ğ’S“–
+/// æ—…è²»ç”³è«‹ãƒ‡ãƒ¼ã‚¿ã‚¢ã‚¯ã‚»ã‚¹ã‚µãƒ¼ãƒ“ã‚¹
+/// Azure Table Storageã¨ã®é€šä¿¡ã‚’æ‹…å½“
 /// </summary>
 public class TravelExpenseService
 {
@@ -25,21 +25,21 @@ public class TravelExpenseService
         var serviceClient = new TableServiceClient(connectionString);
         _tableClient = serviceClient.GetTableClient(TableName);
         
-        // ƒe[ƒuƒ‹‚ª‘¶İ‚µ‚È‚¢ê‡‚Íì¬
+        // ãƒ†ãƒ¼ãƒ–ãƒ«ãŒå­˜åœ¨ã—ãªã„å ´åˆã¯ä½œæˆ
         _tableClient.CreateIfNotExists();
     }
 
     /// <summary>
-    /// V‹K—·”ï\¿‚ğì¬
+    /// æ–°è¦æ—…è²»ç”³è«‹ã‚’ä½œæˆ
     /// </summary>
     public async Task<TravelExpenseResponse> CreateExpenseAsync(TravelExpenseRequest request)
     {
         var now = DateTime.UtcNow;
         var entity = new TravelExpenseEntity
         {
-            // PartitionKey: ”NŒ‚Åƒp[ƒeƒBƒVƒ‡ƒ“ (—á: "2025-11")
+            // PartitionKey: å¹´æœˆã§ãƒ‘ãƒ¼ãƒ†ã‚£ã‚·ãƒ§ãƒ³ (ä¾‹: "2025-11")
             PartitionKey = now.ToString("yyyy-MM"),
-            // RowKey: ƒ^ƒCƒ€ƒXƒ^ƒ“ƒv + GUID ‚Åƒ†ƒj[ƒN«‚ğ•ÛØ
+            // RowKey: ã‚¿ã‚¤ãƒ ã‚¹ã‚¿ãƒ³ãƒ— + GUID ã§ãƒ¦ãƒ‹ãƒ¼ã‚¯æ€§ã‚’ä¿è¨¼
             RowKey = $"{now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}",
             ApplicationDate = now,
             ApplicantName = request.ApplicantName,
@@ -54,7 +54,7 @@ public class TravelExpenseService
             TotalAmount = request.TransportationCost + request.AccommodationCost + 
                          request.MealCost + request.OtherCost,
             Remarks = request.Remarks,
-            Status = "³”F‘Ò‚¿"
+            Status = "æ‰¿èªå¾…ã¡"
         };
 
         await _tableClient.AddEntityAsync(entity);
@@ -63,7 +63,7 @@ public class TravelExpenseService
     }
 
     /// <summary>
-    /// ‚·‚×‚Ä‚Ì—·”ï\¿‚ğæ“¾
+    /// ã™ã¹ã¦ã®æ—…è²»ç”³è«‹ã‚’å–å¾—
     /// </summary>
     public async Task<List<TravelExpenseResponse>> GetAllExpensesAsync()
     {
@@ -74,12 +74,12 @@ public class TravelExpenseService
             expenses.Add(MapToResponse(entity));
         }
 
-        // \¿“ú‚Å~‡ƒ\[ƒg
+        // ç”³è«‹æ—¥ã§é™é †ã‚½ãƒ¼ãƒˆ
         return expenses.OrderByDescending(e => e.ApplicationDate).ToList();
     }
 
     /// <summary>
-    /// ID‚Å—·”ï\¿‚ğæ“¾
+    /// IDã§æ—…è²»ç”³è«‹ã‚’å–å¾—
     /// </summary>
     public async Task<TravelExpenseResponse?> GetExpenseByIdAsync(string partitionKey, string rowKey)
     {
@@ -95,7 +95,7 @@ public class TravelExpenseService
     }
 
     /// <summary>
-    /// —·”ï\¿‚ğXV
+    /// æ—…è²»ç”³è«‹ã‚’æ›´æ–°
     /// </summary>
     public async Task<TravelExpenseResponse?> UpdateExpenseAsync(string partitionKey, string rowKey, TravelExpenseRequest request)
     {
@@ -104,7 +104,7 @@ public class TravelExpenseService
             var response = await _tableClient.GetEntityAsync<TravelExpenseEntity>(partitionKey, rowKey);
             var entity = response.Value;
 
-            // XV
+            // æ›´æ–°
             entity.ApplicantName = request.ApplicantName;
             entity.TravelDate = DateTime.SpecifyKind(request.TravelDate, DateTimeKind.Utc);
             entity.Destination = request.Destination;
@@ -129,7 +129,7 @@ public class TravelExpenseService
     }
 
     /// <summary>
-    /// —·”ï\¿‚ÌƒXƒe[ƒ^ƒX‚ğXV
+    /// æ—…è²»ç”³è«‹ã®ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ã‚’æ›´æ–°
     /// </summary>
     public async Task<TravelExpenseResponse?> UpdateStatusAsync(string partitionKey, string rowKey, string status)
     {
@@ -151,7 +151,36 @@ public class TravelExpenseService
     }
 
     /// <summary>
-    /// —·”ï\¿‚ğíœ
+    /// ä¸æ­£æ¤œçŸ¥çµæœã‚’æ›´æ–°
+    /// </summary>
+    public async Task<TravelExpenseResponse?> UpdateFraudCheckResultAsync(
+        string partitionKey, 
+        string rowKey, 
+        string result, 
+        string details)
+    {
+        try
+        {
+            var response = await _tableClient.GetEntityAsync<TravelExpenseEntity>(partitionKey, rowKey);
+            var entity = response.Value;
+
+            entity.FraudCheckCompleted = true;
+            entity.FraudCheckDate = DateTime.UtcNow;
+            entity.FraudCheckResult = result;
+            entity.FraudCheckDetails = details;
+
+            await _tableClient.UpdateEntityAsync(entity, entity.ETag, TableUpdateMode.Replace);
+
+            return MapToResponse(entity);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// æ—…è²»ç”³è«‹ã‚’å‰Šé™¤
     /// </summary>
     public async Task<bool> DeleteExpenseAsync(string partitionKey, string rowKey)
     {
@@ -167,7 +196,7 @@ public class TravelExpenseService
     }
 
     /// <summary>
-    /// ƒTƒ}ƒŠ[î•ñ‚ğæ“¾
+    /// ã‚µãƒãƒªãƒ¼æƒ…å ±ã‚’å–å¾—
     /// </summary>
     public async Task<TravelExpenseSummary> GetSummaryAsync()
     {
@@ -175,12 +204,12 @@ public class TravelExpenseService
 
         await foreach (var entity in _tableClient.QueryAsync<TravelExpenseEntity>())
         {
-            if (entity.Status == "³”F‘Ò‚¿")
+            if (entity.Status == "æ‰¿èªå¾…ã¡")
             {
                 summary.PendingTotal += entity.TotalAmount;
                 summary.PendingCount++;
             }
-            else if (entity.Status == "³”FÏ‚İ")
+            else if (entity.Status == "æ‰¿èªæ¸ˆã¿")
             {
                 summary.ApprovedTotal += entity.TotalAmount;
                 summary.ApprovedCount++;
@@ -209,7 +238,11 @@ public class TravelExpenseService
             OtherCost = entity.OtherCost,
             TotalAmount = entity.TotalAmount,
             Remarks = entity.Remarks,
-            Status = entity.Status
+            Status = entity.Status,
+            FraudCheckCompleted = entity.FraudCheckCompleted,
+            FraudCheckDate = entity.FraudCheckDate,
+            FraudCheckResult = entity.FraudCheckResult,
+            FraudCheckDetails = entity.FraudCheckDetails
         };
     }
 }

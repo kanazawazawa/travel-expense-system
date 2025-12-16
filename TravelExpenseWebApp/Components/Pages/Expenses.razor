@@ -6,6 +6,7 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
 
 <PageTitle>旅費精算一覧</PageTitle>
 
@@ -27,6 +28,12 @@ else
         </button>
         <button class="btn btn-secondary" @onclick="LoadData">
             <i class="bi bi-arrow-clockwise"></i> 更新
+        </button>
+        <button class="btn btn-warning" @onclick="RunFraudCheckForUncheckedOnly">
+            <i class="bi bi-shield-exclamation"></i> 未チェック項目を一括検知
+        </button>
+        <button class="btn btn-danger" @onclick="RunFraudCheckForAllItems">
+            <i class="bi bi-shield-fill"></i> 全項目を一括検知（再実行）
         </button>
     </div>
 
@@ -87,6 +94,7 @@ else
                 <th>交通手段</th>
                 <th>合計金額</th>
                 <th>ステータス</th>
+                <th>不正検知</th>
                 <th>操作</th>
             </tr>
         </thead>
@@ -107,6 +115,29 @@ else
                         </span>
                     </td>
                     <td>
+                        @if (expense.FraudCheckCompleted == true)
+                        {
+                            <span class="badge bg-@GetFraudCheckBadgeClass(expense.FraudCheckResult)" 
+                                  title="@expense.FraudCheckDetails"
+                                  style="cursor: help;">
+                                @GetFraudCheckDisplayText(expense.FraudCheckResult)
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary mt-1" 
+                                    @onclick="() => RunFraudCheck(expense)"
+                                    disabled="@isRunningFraudCheck">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-warning" 
+                                    @onclick="() => RunFraudCheck(expense)"
+                                    disabled="@isRunningFraudCheck">
+                                <i class="bi bi-shield-exclamation"></i> チェック
+                            </button>
+                        }
+                    </td>
+                    <td>
                         <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteExpense(expense)">
                             <i class="bi bi-trash"></i> 削除
                         </button>
@@ -121,11 +152,40 @@ else
     private List<TravelExpenseResponse> expenses = new();
     private TravelExpenseSummary? summary;
     private bool isLoading = true;
+    private bool isRunningFraudCheck = false;
     private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
+        
+        Console.WriteLine($"データ読み込み完了: {expenses.Count}件");
+        
+        // 全件のチェック状態をログ出力
+        Console.WriteLine("=== 全件のチェック状態 ===");
+        foreach (var exp in expenses)
+        {
+            Console.WriteLine($"  [{exp.ApplicantName}] Completed={exp.FraudCheckCompleted}, Result={exp.FraudCheckResult}, Details={exp.FraudCheckDetails?.Substring(0, Math.Min(50, exp.FraudCheckDetails?.Length ?? 0))}");
+        }
+        
+        // 初回表示時に未チェックの項目をバックグラウンドで自動チェック
+        var uncheckedExpenses = expenses.Where(e => e.FraudCheckCompleted != true).ToList();
+        
+        Console.WriteLine($"未チェック項目: {uncheckedExpenses.Count}件");
+        foreach (var exp in uncheckedExpenses.Take(3))
+        {
+            Console.WriteLine($"  - {exp.ApplicantName}: FraudCheckCompleted={exp.FraudCheckCompleted}");
+        }
+        
+        if (uncheckedExpenses.Count > 0)
+        {
+            Console.WriteLine($"初期化完了 - {uncheckedExpenses.Count}件の不正検知をバックグラウンドで開始");
+            await RunFraudCheckForUnchecked();
+        }
+        else
+        {
+            Console.WriteLine("初期化完了 - 未チェック項目なし");
+        }
     }
 
     private async Task LoadData()
@@ -169,6 +229,177 @@ else
         }
     }
 
+    private async Task RunFraudCheck(TravelExpenseResponse expense)
+    {
+        try
+        {
+            isRunningFraudCheck = true;
+            errorMessage = null;
+            StateHasChanged();
+
+            await RunFraudCheckInternal(expense);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"不正検知に失敗しました: {ex.Message}";
+            Console.WriteLine($"不正検知エラー: {ex}");
+            await JSRuntime.InvokeVoidAsync("alert", $"エラー: {ex.Message}");
+        }
+        finally
+        {
+            isRunningFraudCheck = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunFraudCheckForUnchecked()
+    {
+        var uncheckedExpenses = expenses.Where(e => e.FraudCheckCompleted != true).ToList();
+        
+        if (uncheckedExpenses.Count == 0)
+        {
+            return;
+        }
+
+        await RunFraudCheckForList(uncheckedExpenses);
+    }
+
+    private async Task RunFraudCheckForList(List<TravelExpenseResponse> targetExpenses)
+    {
+        if (targetExpenses.Count == 0)
+        {
+            return;
+        }
+
+        Console.WriteLine($"一括不正検知開始: {targetExpenses.Count}件");
+        
+        // バックグラウンドで非同期処理（await しない）
+        _ = Task.Run(async () =>
+        {
+            foreach (var expense in targetExpenses)
+            {
+                try
+                {
+                    await RunFraudCheckInternalBackground(expense);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"不正検知エラー (ID={expense.Id}): {ex.Message}");
+                }
+            }
+            
+            Console.WriteLine($"一括不正検知完了: {targetExpenses.Count}件");
+        });
+    }
+
+    private async Task RunFraudCheckInternal(TravelExpenseResponse expense)
+    {
+        try
+        {
+            var partitionKey = expense.ApplicationDate.ToString("yyyy-MM");
+            
+            Console.WriteLine($"不正検知開始: PartitionKey={partitionKey}, RowKey={expense.Id}");
+            
+            var updatedExpense = await ApiService.RunFraudCheckAsync(partitionKey, expense.Id);
+
+            // リスト内の該当項目を更新
+            var index = expenses.FindIndex(e => e.Id == expense.Id);
+            if (index >= 0)
+            {
+                expenses[index] = updatedExpense;
+                Console.WriteLine($"不正検知完了: Result={updatedExpense.FraudCheckResult}");
+                
+                // UI更新
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"不正検知エラー (ID={expense.Id}): {ex.Message}");
+        }
+    }
+
+    private async Task RunFraudCheckInternalBackground(TravelExpenseResponse expense)
+    {
+        var partitionKey = expense.ApplicationDate.ToString("yyyy-MM");
+        
+        Console.WriteLine($"[バックグラウンド] 不正検知開始: {expense.ApplicantName} - {expense.Destination}");
+        
+        var updatedExpense = await ApiService.RunFraudCheckAsync(partitionKey, expense.Id);
+
+        // リスト内の該当項目を更新（UIスレッドで実行）
+        await InvokeAsync(() =>
+        {
+            var index = expenses.FindIndex(e => e.Id == expense.Id);
+            if (index >= 0)
+            {
+                expenses[index] = updatedExpense;
+                Console.WriteLine($"[バックグラウンド] 不正検知完了: {expense.ApplicantName} - Result={updatedExpense.FraudCheckResult}");
+                StateHasChanged();
+            }
+        });
+    }
+
+    private async Task RunFraudCheckForUncheckedOnly()
+    {
+        Console.WriteLine($"未チェック項目の一括チェック開始: 総件数={expenses.Count}件");
+        
+        var uncheckedExpenses = expenses.Where(e => e.FraudCheckCompleted != true).ToList();
+        var uncheckedCount = uncheckedExpenses.Count;
+        
+        Console.WriteLine($"未チェック項目: {uncheckedCount}件");
+        foreach (var exp in uncheckedExpenses.Take(3))
+        {
+            Console.WriteLine($"  - {exp.ApplicantName} ({exp.Destination}): FraudCheckCompleted={exp.FraudCheckCompleted}");
+        }
+        
+        if (uncheckedCount == 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "未チェックの項目はありません。");
+            return;
+        }
+        
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", 
+            $"未チェックの項目（{uncheckedCount}件）に対して不正検知をバックグラウンドで実行します。\n" +
+            "完了したものから順次結果が表示されます。\nよろしいですか？"))
+        {
+            return;
+        }
+
+        await RunFraudCheckForList(uncheckedExpenses);
+        
+        // 処理開始を通知
+        await JSRuntime.InvokeVoidAsync("alert", 
+            $"{uncheckedCount}件の不正検知をバックグラウンドで開始しました。\n" +
+            "完了したものから順次画面に反映されます。");
+    }
+
+    private async Task RunFraudCheckForAllItems()
+    {
+        Console.WriteLine($"全項目の一括チェック開始: 総件数={expenses.Count}件");
+        
+        if (expenses.Count == 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "チェックする項目がありません。");
+            return;
+        }
+        
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", 
+            $"全項目（{expenses.Count}件）に対して不正検知をバックグラウンドで実行します。\n" +
+            "※既にチェック済みの項目も再実行されます。\n" +
+            "完了したものから順次結果が表示されます。\nよろしいですか？"))
+        {
+            return;
+        }
+
+        await RunFraudCheckForList(expenses.ToList());
+        
+        // 処理開始を通知
+        await JSRuntime.InvokeVoidAsync("alert", 
+            $"{expenses.Count}件の不正検知をバックグラウンドで開始しました。\n" +
+            "完了したものから順次画面に反映されます。");
+    }
+
     private string GetStatusBadgeClass(string status)
     {
         return status switch
@@ -177,6 +408,28 @@ else
             "却下" => "danger",
             "申請中" => "warning",
             _ => "secondary"
+        };
+    }
+
+    private string GetFraudCheckBadgeClass(string? result)
+    {
+        return result switch
+        {
+            "OK" => "success",
+            "WARNING" => "warning",
+            "ERROR" => "danger",
+            _ => "secondary"
+        };
+    }
+
+    private string GetFraudCheckDisplayText(string? result)
+    {
+        return result switch
+        {
+            "OK" => "正常",
+            "WARNING" => "要注意",
+            "ERROR" => "異常",
+            _ => "未実施"
         };
     }
 

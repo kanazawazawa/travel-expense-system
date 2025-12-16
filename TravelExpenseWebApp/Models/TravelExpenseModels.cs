@@ -30,6 +30,12 @@ public class TravelExpenseResponse
     public int TotalAmount { get; set; }
     public string Status { get; set; } = "申請中";
     public string? Remarks { get; set; }
+    
+    // 不正検知関連プロパティ
+    public bool? FraudCheckCompleted { get; set; }
+    public DateTime? FraudCheckDate { get; set; }
+    public string? FraudCheckResult { get; set; }
+    public string? FraudCheckDetails { get; set; }
 }
 
 public class TravelExpenseSummary

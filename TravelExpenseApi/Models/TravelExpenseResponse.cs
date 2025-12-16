@@ -1,49 +1,61 @@
 namespace TravelExpenseApi.Models;
 
 /// <summary>
-/// —·”ï\¿ƒŒƒXƒ|ƒ“ƒXDTO
+/// æ—…è²»ç”³è«‹ãƒ¬ã‚¹ãƒãƒ³ã‚¹DTO
 /// </summary>
 public class TravelExpenseResponse
 {
-    /// <summary>\¿ID (RowKey)</summary>
+    /// <summary>ç”³è«‹ID (RowKey)</summary>
     public string Id { get; set; } = default!;
     
-    /// <summary>\¿“ú</summary>
+    /// <summary>ç”³è«‹æ—¥</summary>
     public DateTime ApplicationDate { get; set; }
     
-    /// <summary>\¿Ò–¼</summary>
+    /// <summary>ç”³è«‹è€…å</summary>
     public string ApplicantName { get; set; } = default!;
     
-    /// <summary>o’£“ú</summary>
+    /// <summary>å‡ºå¼µæ—¥</summary>
     public DateTime TravelDate { get; set; }
     
-    /// <summary>o’£æ</summary>
+    /// <summary>å‡ºå¼µå…ˆ</summary>
     public string Destination { get; set; } = default!;
     
-    /// <summary>–Ú“I</summary>
+    /// <summary>ç›®çš„</summary>
     public string Purpose { get; set; } = default!;
     
-    /// <summary>Œğ’Êè’i</summary>
+    /// <summary>äº¤é€šæ‰‹æ®µ</summary>
     public string Transportation { get; set; } = default!;
     
-    /// <summary>Œğ’Ê”ï (‰~)</summary>
+    /// <summary>äº¤é€šè²» (å††)</summary>
     public int TransportationCost { get; set; }
     
-    /// <summary>h”‘”ï (‰~)</summary>
+    /// <summary>å®¿æ³Šè²» (å††)</summary>
     public int AccommodationCost { get; set; }
     
-    /// <summary>H–‘ã (‰~)</summary>
+    /// <summary>é£Ÿäº‹ä»£ (å††)</summary>
     public int MealCost { get; set; }
     
-    /// <summary>‚»‚Ì‘¼ (‰~)</summary>
+    /// <summary>ãã®ä»– (å††)</summary>
     public int OtherCost { get; set; }
     
-    /// <summary>‡Œv‹àŠz (‰~)</summary>
+    /// <summary>åˆè¨ˆé‡‘é¡ (å††)</summary>
     public int TotalAmount { get; set; }
     
-    /// <summary>”õl</summary>
+    /// <summary>å‚™è€ƒ</summary>
     public string? Remarks { get; set; }
     
-    /// <summary>ƒXƒe[ƒ^ƒX</summary>
+    /// <summary>ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹</summary>
     public string Status { get; set; } = default!;
+    
+    /// <summary>ä¸æ­£æ¤œçŸ¥ãƒã‚§ãƒƒã‚¯å®Œäº†ãƒ•ãƒ©ã‚°</summary>
+    public bool? FraudCheckCompleted { get; set; }
+    
+    /// <summary>ä¸æ­£æ¤œçŸ¥ãƒã‚§ãƒƒã‚¯æ—¥æ™‚</summary>
+    public DateTime? FraudCheckDate { get; set; }
+    
+    /// <summary>ä¸æ­£æ¤œçŸ¥çµæœ (OK, WARNING, ERROR)</summary>
+    public string? FraudCheckResult { get; set; }
+    
+    /// <summary>ä¸æ­£æ¤œçŸ¥è©³ç´°ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸</summary>
+    public string? FraudCheckDetails { get; set; }
 }

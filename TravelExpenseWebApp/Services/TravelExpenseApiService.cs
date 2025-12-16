@@ -110,4 +110,12 @@ public class TravelExpenseApiService
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TravelExpenseSummary>() ?? new TravelExpenseSummary();
     }
+
+    public async Task<TravelExpenseResponse> RunFraudCheckAsync(string partitionKey, string rowKey)
+    {
+        await SetAuthorizationHeaderAsync();
+        var response = await _httpClient.PostAsync($"{_baseUrl}/{partitionKey}/{rowKey}/fraud-check", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TravelExpenseResponse>() ?? throw new Exception("Failed to run fraud check");
+    }
 }
